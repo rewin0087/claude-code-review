@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://rewin0087.github.io/claude-code-review/sitemap.xml

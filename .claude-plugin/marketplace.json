@@ -1,0 +1,18 @@
+{
+  "name": "rewin0087",
+  "owner": {
+    "name": "rewin0087",
+    "url": "https://github.com/rewin0087"
+  },
+  "description": "Claude Code plugins by rewin0087",
+  "plugins": [
+    {
+      "name": "code-review",
+      "source": "./",
+      "description": "AI code review of your branch's changes with an interactive HTML report.",
+      "version": "1.0.0",
+      "category": "development",
+      "keywords": ["code-review", "ai-code-review", "pull-request", "git"]
+    }
+  ]
+}

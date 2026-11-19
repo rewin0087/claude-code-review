@@ -1,41 +1,73 @@
-# claude-code-review
+# claude-code-review: AI code review for Claude Code
 
-An AI code reviewer for [Claude Code](https://claude.com/claude-code). It reviews **only the changes your branch introduces**, or just the file, lines or editor selection you point it at, in any tech stack. It checks the approach, suggests better alternatives backed by web sources, looks back through git history to see *why* the existing code was written that way, and opens an **interactive HTML report** with the review comments shown on the diff lines.
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-7c5cff)](https://github.com/rewin0087/claude-code-review#install)
+[![Version](https://img.shields.io/github/v/release/rewin0087/claude-code-review?sort=semver)](https://github.com/rewin0087/claude-code-review/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/docs-website-blue)](https://rewin0087.github.io/claude-code-review/)
 
-It runs on your existing Claude Code session. You don't need an API key or a server.
+**`/code-review` is an AI code review skill and plugin for [Claude Code](https://claude.com/claude-code).** It reviews **only the changes your git branch introduces**, or just the file, lines or editor selection you point it at, in **any tech stack**. It validates the approach, suggests better alternatives **backed by web references**, uses **git history** to see why existing code was written that way, and opens an **interactive HTML report** with every review comment shown on the diff line.
+
+It runs on your existing Claude Code session, in the terminal, VS Code or JetBrains. You don't need an API key, server or CI setup.
+
+![The interactive code review report: a diff with inline AI review comments, severity badges and suggested fixes](docs/images/report-diff.png)
 
 ## Features
 
 - **Branch-only diff**: compares against the merge-base, so commits that landed on `main` after you branched are excluded. The base branch (`main`, `master`, `develop`, …) is detected automatically.
+- **Review a file, a line range or your editor selection**: highlight code in VS Code and run `/code-review`, or pass `src/app.py:40-80`, folders or globs. Unchanged code is reviewed as it is.
 - **Any stack**: detects languages, frameworks and versions from the files and manifests, and fits its advice to the versions you use.
 - **Approach validation**: infers what the change is trying to do and rates the approach (sound / acceptable / questionable / flawed). It proposes alternative approaches with pros and cons and marks one as recommended.
 - **Reasoned comments**: each comment has a severity, category, confidence, a concrete failure scenario, its reasoning, a suggested fix with code, and alternatives.
-- **Web references**: cites official docs, OWASP/CWE, RFCs and well-known open-source projects. It may only cite links it actually opened, and its searches never include your code.
+- **Web references**: every critical or major finding cites official docs, OWASP/CWE, RFCs or well-known open-source code. It may only cite links it actually opened, and its searches never include your code.
 - **Git history ("why is it like this?")**: blames the lines your branch removes or rewrites and finds the commits that introduced them. It flags past fixes, reverts and workarounds, and warns when a change could bring an old bug back. Every cited commit SHA is checked against the repo.
 - **Interactive report**: unified or side-by-side diff with inline comments, a file/comment sidebar, severity filters, search, resolve/viewed tracking, an "Open in VS Code" link, commit links to GitHub/GitLab, keyboard navigation, dark mode, and "Copy as Markdown" for PR descriptions.
+- **Results in the chat**: the verdict, the approach rating and a table of every finding, with a link to the report.
 - **Large diffs**: split across parallel sub-agents.
 
 ## Install
 
-Install it **for one folder only** (it's available when you start `claude` in that folder):
+### As a Claude Code plugin (recommended)
 
-```bash
-git clone https://github.com/rewin0087/claude-code-review.git <folder>/.claude/skills/code-review
+In Claude Code (2.1.275 or later):
+
+```text
+/plugin install code-review --marketplace rewin0087/claude-code-review
 ```
 
-Or **for every project**:
+Or in two steps, which works on any version with plugins:
+
+```text
+/plugin marketplace add rewin0087/claude-code-review
+/plugin install code-review@rewin0087
+```
+
+From a shell: `claude plugin marketplace add rewin0087/claude-code-review && claude plugin install code-review@rewin0087`.
+
+Claude Code namespaces plugin commands, so you run the plugin as **`/code-review:code-review`**. Update it with `claude plugin update code-review@rewin0087`.
+
+### As a standalone skill (plain `/code-review`)
+
+If you'd rather type `/code-review`, clone it as a skill. For every project:
 
 ```bash
 git clone https://github.com/rewin0087/claude-code-review.git ~/.claude/skills/code-review
 ```
 
-Requirements: Claude Code, `git`, and Python 3.8+ (standard library only).
+Or for one folder only (available when you start `claude` in that folder):
+
+```bash
+git clone https://github.com/rewin0087/claude-code-review.git <folder>/.claude/skills/code-review
+```
+
+Update with `git -C ~/.claude/skills/code-review pull`.
 
 > Claude Code looks for project skills from the folder where you start it up to that repo's root. If the skill is in a parent folder that holds several repos, start `claude` in the parent folder and pass the repo name (see below), or install it globally.
 
+**Requirements:** Claude Code, `git`, and Python 3.8+ (standard library only). Tested on macOS. Linux should work, and reports are welcome.
+
 ## Usage
 
-Inside Claude Code:
+Inside Claude Code. These examples use `/code-review`; if you installed the plugin, type `/code-review:code-review` instead:
 
 ```text
 /code-review                              # review the checked-out branch against its base
@@ -258,6 +290,12 @@ scripts/codereview/           the logic (importable, raises ReviewError instead 
 ```
 
 Syntax highlighting loads highlight.js from cdnjs. Without internet the report still works, just without colours.
+
+## Contributing
+
+Issues and pull requests are welcome. If `/code-review` helped you catch a bug, a ⭐ on GitHub helps other developers find it.
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 

@@ -3,7 +3,7 @@ name: code-review
 description: Review ONLY the changes introduced by the current git branch (merge-base..HEAD), or a specific file / line range / folder / editor selection, in any tech stack, use git history to understand why existing code was written that way, validate the approach, propose better/alternative approaches backed by web references, and open an interactive HTML report showing the diff with the review comments inline.
 argument-hint: "[path[:start-end] ...] [--selection|--file|--all] [repo-dir] [base-branch] [--head <branch>] [--uncommitted] [--history] [--focus <area>] [--no-open]"
 disable-model-invocation: true
-allowed-tools: Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/*) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(git blame *) Bash(git rev-parse *) Bash(git merge-base *) Bash(git ls-files *) Bash(git status *) Bash(git -C *) Bash(git grep *) Bash(ls *) Read Grep Glob WebSearch WebFetch Agent Write(**/.code-review/**)
+allowed-tools: Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/*) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(git blame *) Bash(git rev-parse *) Bash(git merge-base *) Bash(git ls-files *) Bash(git status *) Bash(git -C *) Bash(git grep *) Bash(ls *) Read Grep Glob WebSearch WebFetch Agent Edit(**/.code-review/**)
 ---
 
 # Branch code review
@@ -178,8 +178,11 @@ Write the `approach_assessment`: infer the intent, then judge whether the chosen
 the right one. Offer at least one alternative approach (mark one `recommended` if it beats the
 current one; if the current approach is best, say so and explain why the alternatives lose).
 
-Use `WebSearch`/`WebFetch` to support important claims (every critical/major comment and every
-alternative approach should have at least one reference when a good source exists): official
+**References are required, not optional.** Every critical/major comment and every alternative
+approach MUST cite at least one source you actually opened. If `WebSearch`/`WebFetch` aren't
+loaded yet, load them first (e.g. with ToolSearch). Only if web access is truly unavailable,
+leave those `references` empty and say "web research unavailable" in `summary.overview`. Never
+skip this step silently. Use `WebSearch`/`WebFetch` to support the claims: official
 docs for the exact framework version, language specs, RFCs, OWASP/CWE, and source code, docs or
 issues of well-known open-source projects that solve the same problem. Run independent searches
 in parallel.
@@ -200,8 +203,10 @@ correct `side` and line number from the diff.
 python3 ${CLAUDE_SKILL_DIR}/scripts/render.py --dir <OUT_DIR> [--no-open]
 ```
 
-If it reports JSON or validation errors, fix `review.json` and re-run. If it warns that a
-comment's line is not in the diff, re-check the anchor and fix it if it was a mistake.
+If it reports JSON or validation errors, fix `review.json` and re-run. Treat every WARNING as a
+to-do and fix it before finishing: a comment's line not in the diff (re-check the anchor), a
+cited commit that doesn't exist, or a critical/major finding or alternative without a reference
+(do the web research, then re-run).
 
 ## Step 7 — Return the review in the chat
 

@@ -1,0 +1,14 @@
+{
+  "name": "code-review",
+  "displayName": "Code Review",
+  "version": "1.0.0",
+  "description": "AI code review for Claude Code. Reviews only your branch's changes (or a file, range or editor selection) in any tech stack, checks the approach, cites web references, uses git history, and opens an interactive HTML report.",
+  "author": {
+    "name": "rewin0087",
+    "url": "https://github.com/rewin0087"
+  },
+  "homepage": "https://rewin0087.github.io/claude-code-review/",
+  "repository": "https://github.com/rewin0087/claude-code-review",
+  "license": "MIT",
+  "keywords": ["code-review", "ai-code-review", "pull-request", "git", "claude-code", "skill", "developer-tools", "static-analysis"]
+}

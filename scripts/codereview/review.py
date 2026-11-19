@@ -69,7 +69,23 @@ def validate(diff, review):
                             % (where, path, line, side,
                                " (it exists on the other side)" if line in _line_numbers(files[path], other) else ""))
             c["_unanchored"] = True
+    warnings += missing_references(review)
     return errors, warnings
+
+
+def missing_references(review):
+    """Warnings for important claims that aren't backed by a source."""
+    out = []
+    for i, c in enumerate(review.get("comments") or []):
+        if c.get("severity") in ("critical", "major") and not c.get("references"):
+            out.append("comments[%d] (%s: %s) has no references; cite a source for it"
+                       % (i, c.get("severity"), c.get("title", "")))
+    aa = (review.get("summary") or {}).get("approach_assessment") or {}
+    for i, alt in enumerate(aa.get("alternatives") or []):
+        if not alt.get("references"):
+            out.append("summary.approach_assessment.alternatives[%d] (%s) has no references"
+                       % (i, alt.get("title", "")))
+    return out
 
 
 def resolve_history(diff, review):
