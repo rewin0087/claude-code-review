@@ -87,6 +87,154 @@ The report is written to `<repo>/.code-review/<branch>/report.html`. That folder
 
 ## How it works
 
+### Workflow: from input to outcome
+
+```mermaid
+flowchart TD
+    subgraph IN["1 - Input"]
+        A1["Run /code-review<br/>whole branch"]
+        A2["Paths and ranges<br/>src/app.py:40-80, src/, globs"]
+        A3["Editor selection or open file<br/>VS Code, JetBrains"]
+        A4["Flags<br/>--head, --base, --history, --focus"]
+    end
+
+    subgraph COLLECT["2 - Collect: deterministic scripts"]
+        B1["Resolve scope<br/>paths, then selection, then whole branch"]
+        B2["Detect base branch<br/>main, master, develop ..."]
+        B3["git diff merge-base..head<br/>only this branch's changes"]
+        B4["Snapshot unchanged code<br/>to review it as-is"]
+        B5[("diff.json + meta.json")]
+    end
+
+    subgraph AI["3 - AI review: Claude Code"]
+        C1["Understand the change<br/>full files, callers, tests,<br/>stack and versions"]
+        C8["Parallel subagents<br/>one per file group"]
+        C2{"Existing code changed<br/>or --history?"}
+        C3["Git history<br/>blame, log -L, log -S<br/>why the code exists"]
+        C4["Review checklist<br/>correctness, security, data,<br/>concurrency, performance,<br/>design, tests"]
+        C5["Validate the approach<br/>rate it, propose alternatives"]
+        C6["Web research<br/>official docs, OWASP / CWE,<br/>RFCs, open-source code"]
+        C7[("review.json")]
+    end
+
+    subgraph RENDER["4 - Validate and render"]
+        D1{"Anchors and cited<br/>commit SHAs valid?"}
+        D2["report.html<br/>interactive diff + review"]
+        D3["summary.md<br/>posted in the chat"]
+    end
+
+    subgraph OUT["5 - Outcome"]
+        E1["Verdict<br/>approve, approve with suggestions,<br/>or request changes"]
+        E2["Inline findings<br/>fix, reasoning, alternatives,<br/>references, history"]
+        E3["You act<br/>fix code, resolve comments,<br/>Open in VS Code, Copy MD to the PR"]
+    end
+
+    A1 & A2 & A3 & A4 --> B1
+    B1 --> B2 --> B3 --> B5
+    B1 --> B4 --> B5
+    B5 --> C1
+    C1 -. large diff .-> C8 -.-> C4
+    C1 --> C2
+    C2 -- yes --> C3 --> C4
+    C2 -- no --> C4
+    C4 --> C5 --> C6 --> C7
+    C7 --> D1
+    D1 -- no: fix review.json --> C7
+    D1 -- yes --> D2 & D3
+    D3 --> E1
+    D2 --> E2
+    E1 & E2 --> E3
+```
+
+| Stage | Who does it | Output |
+|---|---|---|
+| **1. Input** | You: a command, paths, an editor selection, flags | what to review |
+| **2. Collect** | `collect_diff.py`: deterministic, no AI | `diff.json`, `meta.json` |
+| **3. AI review** | Claude Code, guided by `SKILL.md` | `review.json` |
+| **4. Validate and render** | `render.py`: checks every line anchor and commit SHA | `report.html`, `summary.md` |
+| **5. Outcome** | You, in the chat and the browser | fixes, resolved comments, PR notes |
+
+The scripts handle the exact parts: which lines changed, line numbers, SHAs, rendering. Claude does the judgement: bugs, design, alternatives, research. Because `render.py` rejects anything that doesn't match the real diff or git history, the report can't point at lines or commits that don't exist.
+
+### Step by step
+
+```mermaid
+sequenceDiagram
+    actor You
+    participant CC as Claude Code
+    participant S as Scripts
+    participant G as Git
+    participant W as Web
+    participant R as HTML report
+
+    You->>CC: /code-review [paths] [flags], or highlight code first
+    CC->>S: collect_diff.py
+    S->>G: merge-base, diff, ls-files
+    G-->>S: branch changes or current code
+    S-->>CC: diff.json and an overview
+    CC->>G: read changed files, callers and tests
+    opt existing code changed, or --history
+        CC->>S: history.py
+        S->>G: blame and log at the merge-base
+        S-->>CC: who changed it, when and why
+    end
+    CC->>W: search docs, OWASP, open-source projects
+    W-->>CC: references
+    CC->>CC: review and approach assessment, write review.json
+    CC->>S: render.py
+    S-->>R: report.html
+    S-->>CC: summary.md
+    CC-->>You: verdict, findings table, link to the report
+    You->>R: navigate, resolve, copy as Markdown
+```
+
+### The result
+
+You get two outputs: a summary in the chat (below), and the interactive report in your browser.
+
+```text
+## Code review: `feature/search` → `main` — **REQUEST CHANGES**
+Adds user search, but the query is SQL-injectable and the client doesn't encode input.
+2 files, +13 / -0 · 1 commit(s) · 1 critical, 1 major, 1 minor, 1 suggestion, 1 praise
+
+**Approach — questionable:** String interpolation into SQL breaks the parameterised pattern ...
+**Recommended alternative:** Parameterised LIKE with escaped wildcards
+
+| # | Severity | Location    | Issue                         | Suggested fix      |
+| 1 | critical | users.py:11 | SQL injection in search_users | Use a placeholder. |
+| 2 | major    | app.js:2    | Query param not URL-encoded   | see code in report |
+
+**Full interactive review**: report.html
+```
+
+**Report layout**
+
+```text
++--------------------------------------------------------------------------------+
+| repo  branch -> base  [scope] +13 -0  [REQUEST CHANGES]  Unified|Split Copy MD |
++-----------------------+--------------------------------------------------------+
+| Filter files/comments | REVIEW SUMMARY   headline, stack, severity counts,     |
+| (o) Critical (o) Major|                  "must address" list                   |
+| [ ] Hide resolved     | APPROACH         rating, analysis, alternatives with   |
+| ####---- 2/5 resolved |                  pros / cons / references              |
+| [Files] [Comments]    | HISTORY          timeline of the commits behind it     |
+|                       | ------------------------------------------------------ |
+| app.js      (1) +4 -0 | app.js                                                 |
+| users.py    (4) +9 -0 |  2 + const res = await fetch('/api/users?name=' + ...  |
+|                       |    +- MAJOR  Query param not URL-encoded ----------+   |
+|                       |    | problem, reasoning, suggested fix (copy),     |   |
+|                       |    | alternatives, references, history             |   |
+|                       |    | [Resolve] [Copy as Markdown] [Open in VS Code]|   |
+|                       |    +-----------------------------------------------+   |
++-----------------------+--------------------------------------------------------+
+```
+
+| Review summary and approach | Diff with inline review |
+|---|---|
+| ![Review summary, severity counts and approach assessment](docs/images/report-overview.png) | ![Diff with inline review comments and suggested fixes](docs/images/report-diff.png) |
+
+### Files
+
 ```
 SKILL.md                      instructions Claude follows (method, scope, history, references, output)
 references/review-schema.md   the review.json format Claude writes
@@ -108,11 +256,6 @@ scripts/codereview/           the logic (importable, raises ReviewError instead 
   summary.py                  the summary posted in the chat
   report.py                   HTML report generation
 ```
-
-1. `collect_diff.py` diffs `merge-base(base, head)..head`.
-2. Claude reads the full changed files, their callers and tests, and (when needed) the git history.
-3. Claude researches supporting references on the web.
-4. Claude writes `review.json`, which `render.py` checks and turns into the report.
 
 Syntax highlighting loads highlight.js from cdnjs. Without internet the report still works, just without colours.
 
