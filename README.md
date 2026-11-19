@@ -1,6 +1,6 @@
 # claude-code-review
 
-An AI code reviewer for [Claude Code](https://claude.com/claude-code). It reviews **only the changes your branch introduces** in any tech stack. It checks the approach, suggests better alternatives backed by web sources, looks back through git history to see *why* the existing code was written that way, and opens an **interactive HTML report** with the review comments shown on the diff lines.
+An AI code reviewer for [Claude Code](https://claude.com/claude-code). It reviews **only the changes your branch introduces**, or just the file, lines or editor selection you point it at, in any tech stack. It checks the approach, suggests better alternatives backed by web sources, looks back through git history to see *why* the existing code was written that way, and opens an **interactive HTML report** with the review comments shown on the diff lines.
 
 It runs on your existing Claude Code session. You don't need an API key or a server.
 
@@ -49,6 +49,22 @@ Inside Claude Code:
 ```
 
 You can also ask in plain words, e.g. *"review this with history"*.
+
+### Review specific files, lines or the editor selection
+
+```text
+/code-review src/billing/charge.ts            # one file
+/code-review src/billing/charge.ts:40-80      # a line range (also :40 or #L40-L80)
+/code-review src/billing/ 'src/**/*.sql'      # folders and globs
+/code-review @src/app.py                      # Claude Code @-mentions work too
+/code-review --selection                      # the code highlighted in VS Code / JetBrains
+/code-review --file                           # the file open in the editor
+/code-review --all                            # ignore the editor; review the whole branch
+```
+
+- In the IDE, **highlighted code is used automatically**: highlight lines, run `/code-review`, and only that selection is reviewed. An open file with nothing highlighted is ignored unless you pass `--file` or say "review this file".
+- If the branch changed code inside the scope, those changes are reviewed. If it didn't (or you're on `main`), the **current code is reviewed as-is**. Mixed scopes do both, file by file. `--changes-only` / `--as-is` force one mode.
+- Scoped reviews include uncommitted edits, so line numbers match your editor. Each scope gets its own report folder, so it doesn't overwrite the full-branch report.
 
 When the review finishes, Claude posts a summary in the chat (terminal or VS Code): the verdict, the approach rating, the recommended alternative, history notes, a table of **every** finding with `file:line`, and a link to the full interactive report. The same summary is saved as `summary.md`.
 

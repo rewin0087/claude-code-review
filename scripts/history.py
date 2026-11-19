@@ -48,8 +48,9 @@ def ranges(nums, pad=0):
 
 
 def blame(repo, rev, path, start, end):
-    """Return list of (line_no, sha) for the range at rev."""
-    txt = git(["blame", "--line-porcelain", "-w", "-M", "-C", "-L", "%d,%d" % (start, end), rev, "--", path], repo)
+    """Return list of (line_no, sha) for the range at rev (rev=None: the working-tree file)."""
+    txt = git(["blame", "--line-porcelain", "-w", "-M", "-C", "-L", "%d,%d" % (start, end)] +
+              ([rev] if rev else []) + ["--", path], repo)
     res, sha, final = [], None, None
     for ln in txt.split("\n"):
         m = re.match(r"^([0-9a-f]{40}) \d+ (\d+)", ln)
@@ -84,7 +85,9 @@ def main():
 
     diff = json.load(open(os.path.join(a.dir, "diff.json")))
     meta = diff["meta"]
-    repo, base_rev = meta["repo_path"], meta["merge_base"]
+    repo = meta["repo_path"]
+    base_rev = meta.get("merge_base") or meta["head"]
+    snap_rev = None if meta.get("worktree") else meta["head"]   # code reviewed as-is
     body_len = 1500 if a.deep else 400
     commits, files_out = {}, {}
 
@@ -99,6 +102,23 @@ def main():
         if f["status"] == "added" or f["generated"] or f["binary"]:
             continue
         old = f["old_path"]
+        if f["status"] == "snapshot":
+            # existing code reviewed as-is: blame the selected lines in the current file
+            sel = [l["n"] for h in f["hunks"] for l in h["lines"] if l.get("s")] or \
+                  [l["n"] for h in f["hunks"] for l in h["lines"]]
+            blamed = []
+            for s, e in ranges(sel):
+                by_sha = {}
+                for line_no, sha in blame(repo, snap_rev, old, s, e):
+                    if remember(sha):
+                        by_sha.setdefault(sha, []).append(line_no)
+                for sha, lines in by_sha.items():
+                    for rs, re_ in ranges(lines):
+                        blamed.append({"old_start": rs, "old_end": re_, "sha": sha, "removed": True})
+            log = git(["log", "--follow", "-n", str(a.recent), "--format=%H", meta["head"], "--", old], repo).split()
+            files_out[f["path"]] = {"old_path": old, "blame": sorted(blamed, key=lambda b: b["old_start"]),
+                                    "recent": [x for x in log if remember(x)], "snapshot": True}
+            continue
         # lines of the BASE version that this branch removes, plus (deep) surrounding context
         removed = [l["o"] for h in f["hunks"] for l in h["lines"] if l["t"] == "del"]
         context = [l["o"] for h in f["hunks"] for l in h["lines"] if l["t"] == "ctx"] if a.deep else []
@@ -121,14 +141,15 @@ def main():
         json.dump({"base": base_rev, "files": files_out, "commits": commits}, fh, indent=1)
 
     # ---- digest for the reviewer ----
-    print("History as of merge-base %s (%d files, %d commits)" % (base_rev[:10], len(files_out), len(commits)))
+    print("History as of %s %s (%d files, %d commits)" % ("merge-base" if meta.get("merge_base") else "HEAD", base_rev[:10], len(files_out), len(commits)))
     if not files_out:
         print("Branch only ADDS files - no prior history for the changed code.")
     for path, info in files_out.items():
         print("\n## %s%s" % (path, "  (was %s)" % info["old_path"] if info["old_path"] != path else ""))
         removed_blame = [b for b in info["blame"] if b["removed"]]
         if removed_blame:
-            print("  Lines this branch removes/rewrites were introduced by:")
+            print("  Selected lines were last changed by:" if info.get("snapshot")
+                  else "  Lines this branch removes/rewrites were introduced by:")
             for b in removed_blame:
                 c = commits[b["sha"]]
                 print("    old L%d-%d  %s %s  %s%s%s" % (b["old_start"], b["old_end"], c["short"], c["date"], c["subject"],

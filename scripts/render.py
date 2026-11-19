@@ -143,11 +143,16 @@ def terminal_summary(diff, review, report_path):
     counts = {}
     for c in comments:
         counts[c["severity"]] = counts.get(c["severity"], 0) + 1
-    L = ["## Code review: `%s` → `%s` — **%s**" % (meta["branch"], meta["base"],
-                                                   summary.get("verdict", "").replace("_", " ").upper())]
+    scope = ", ".join("`%s`" % sc["spec"] for sc in meta.get("scope") or [])
+    target = ("%s on `%s`" % (scope, meta["branch"])) if scope else ("`%s` → `%s`" % (meta["branch"], meta["base"]))
+    L = ["## Code review: %s — **%s**" % (target, summary.get("verdict", "").replace("_", " ").upper())]
     if summary.get("headline"):
         L.append(summary["headline"])
     L.append("")
+    mode_note = {"code": "existing code reviewed as-is (no branch changes in scope)",
+                 "mixed": "branch changes + existing code reviewed as-is"}.get(meta.get("mode"))
+    if mode_note:
+        L.append("_Scope: %s._" % mode_note)
     L.append("%d files, +%d / -%d · %d commit(s) · %s" % (
         meta["stats"]["files"], meta["stats"]["additions"], meta["stats"]["deletions"],
         len(meta.get("commits") or []),
@@ -228,7 +233,7 @@ def main():
     if "__REVIEW_DATA__" not in html:
         fail("template is missing the __REVIEW_DATA__ placeholder")
     html = html.replace("__REVIEW_DATA__", payload, 1)
-    title = "Review: %s → %s" % (diff["meta"]["branch"], diff["meta"]["base"])
+    title = "Review: %s → %s" % (diff["meta"]["branch"], diff["meta"]["base"] or "as-is")
     html = html.replace("__TITLE__", title.replace("&", "&amp;").replace("<", "&lt;"), 1)
 
     out = a.out or os.path.join(a.dir, "report.html")

@@ -183,6 +183,10 @@ details.sec > summary { cursor: pointer; font-size: 11.5px; font-weight: 700; te
 .codebox pre code { background: none; border: 0; padding: 0; font-size: 12.5px; }
 .codebox .copy { position: absolute; top: 6px; right: 6px; opacity: 0; transition: opacity .15s; padding: 2px 8px; font-size: 11.5px; }
 .codebox:hover .copy { opacity: 1; }
+tr.insc td.code:last-child { box-shadow: inset 3px 0 0 var(--accent); }
+tr.insc.hl td.code:last-child { box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 999px rgba(255, 214, 0, .16); }
+.scopenote { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; margin: 8px 0; font-size: 13px; }
+.insc-demo { color: var(--accent); font-weight: 700; }
 .hist { list-style: none; margin: 4px 0; padding: 0; font-size: 13px; border-left: 2px solid var(--border); }
 .hist li { position: relative; padding: 3px 0 3px 14px; }
 .hist li::before { content: ""; position: absolute; left: -5px; top: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
@@ -411,7 +415,12 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
   // ---------- header ----------
   $("#repoName").textContent = META.repo;
   $("#branchName").textContent = META.branch + (META.uncommitted ? " +wt" : ""); $("#branchName").title = META.branch;
-  $("#baseName").textContent = META.base; $("#baseName").title = "merge-base " + META.merge_base;
+  $("#baseName").textContent = META.base || "as-is"; $("#baseName").title = META.merge_base ? "merge-base " + META.merge_base : "No base branch: code reviewed as-is";
+  if (META.scope && META.scope.length) {
+    var sc = el("span", { class: "branch", title: "Review limited to this scope" }, "scope: " + esc(META.scope.map(function (x) { return x.spec; }).join(", ")));
+    sc.style.borderColor = "var(--accent)"; sc.style.color = "var(--accent)";
+    $(".topbar .title").appendChild(sc);
+  }
   $("#topStats").innerHTML = META.stats.files + " files &nbsp;<span class='stat-add'>+" + META.stats.additions + "</span> <span class='stat-del'>−" + META.stats.deletions + "</span>";
   var v = $("#verdict"); v.className = "verdict " + (SUMMARY.verdict || ""); v.textContent = (SUMMARY.verdict || "no verdict").replace(/_/g, " ");
 
@@ -464,6 +473,9 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
     var aa = SUMMARY.approach_assessment || {};
     var h = '<div class="card" id="ovCard"><header><h2>Review summary</h2><span style="flex:1"></span><span class="tag">' + esc(META.generated_at || "") + "</span></header><div class='body'>";
     if (SUMMARY.headline) h += '<p class="headline">' + inline(SUMMARY.headline) + "</p>";
+    if (META.scope && META.scope.length) h += '<div class="scopenote">Scoped review: <b>' + esc(META.scope.map(function (x) { return x.spec; }).join(", ")) + "</b>" +
+      ({ code: " — no branch changes here, so the current code was reviewed as-is.", mixed: " — branch changes where present; the rest of the scope was reviewed as-is.", changes: " — only the branch's changes inside this scope." }[META.mode] || "") +
+      ' Selected lines are marked with <span class="insc-demo">▍</span>.</div>';
     if (SUMMARY.stack && SUMMARY.stack.length) h += '<div class="chips" style="margin-bottom:8px">' + SUMMARY.stack.map(function (s) { return '<span class="tag">' + esc(s) + "</span>"; }).join("") + "</div>";
     h += '<div class="statrow">' + SEVS.map(function (s) { return '<div class="stat" data-sevjump="' + s + '" title="Jump to first ' + s + '"><div class="n" style="color:var(--' + s + ')">' + counts[s] + '</div><div class="l">' + SEV_LABEL[s] + "</div></div>"; }).join("") + "</div>";
     h += md(SUMMARY.overview);
@@ -529,7 +541,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
         var cls = l.t === "add" ? "add" : l.t === "del" ? "del" : "ctx";
         var here = (l.n != null ? idx.lines["new:" + l.n] || [] : []).concat(l.o != null ? idx.lines["old:" + l.o] || [] : []);
         var inR = commentsFor(f.path).some(function (c) { return visibleComment(c) && (l.n != null && inRange(c, "new", l.n) || l.o != null && inRange(c, "old", l.o)); });
-        var tr = el("tr", { class: cls + (inR ? " hl" : "") + (here.length ? " hasc" : "") },
+        var tr = el("tr", { class: cls + (inR ? " hl" : "") + (here.length ? " hasc" : "") + (l.s ? " insc" : "") },
           numTd(l.o) + numTd(l.n) + '<td class="sign">' + (cls === "add" ? "+" : cls === "del" ? "−" : "") + '</td><td class="code">' + (hl(l.c, f.language) || " ") + "</td>");
         tbody.appendChild(tr);
         if (here.length) { var r = crow(here, 4); if (r) tbody.appendChild(r); }
@@ -558,7 +570,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
         var cl = commentsFor(f.path).filter(visibleComment);
         var lh = L && cl.some(function (c) { return inRange(c, "old", L.o) || (L === R && inRange(c, "new", R.n)); }) ? " hl" : "";
         var rh = R && cl.some(function (c) { return inRange(c, "new", R.n); }) ? " hl" : "";
-        var tr = el("tr", { class: here.length ? "hasc" : "" },
+        var tr = el("tr", { class: (here.length ? "hasc" : "") + ((R && R.s) || (L && L.s) ? " insc" : "") },
           '<td class="num ' + lc + lh + '">' + (L ? L.o : "") + '</td><td class="code ' + lc + lh + '">' + (L ? hl(L.c, f.language) || " " : "") + "</td>" +
           '<td class="num ' + rc + rh + '">' + (R ? R.n : "") + '</td><td class="code ' + rc + rh + '">' + (R ? hl(R.c, f.language) || " " : "") + "</td>");
         tbody.appendChild(tr);
@@ -585,7 +597,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
       var cs = commentsFor(f.path), vis = cs.filter(visibleComment);
       var box = el("div", { class: "file" + (collapsed[f.path] ? " collapsed" : ""), id: slug(f.path), "data-path": f.path });
       var head = el("div", { class: "fhead" },
-        '<span class="chev">▾</span><span class="status">' + esc(f.status) + "</span>" +
+        '<span class="chev">▾</span><span class="status"' + (f.status === "snapshot" ? ' title="No branch changes: current code reviewed as-is"' : "") + ">" + esc(f.status === "snapshot" ? "as-is" : f.status) + "</span>" +
         '<span class="fpath">' + (f.status === "renamed" && f.old_path !== f.new_path ? esc(f.old_path) + " → " : "") + esc(f.path) + "</span>" +
         (f.generated ? '<span class="tag">generated</span>' : "") +
         (vis.length ? '<span class="badge sev-' + worst(vis) + '">' + vis.length + " comment" + (vis.length > 1 ? "s" : "") + "</span>" : "") +
@@ -596,6 +608,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
       var body = el("div", { class: "fbody" });
       var fl = (cIndex[f.path] || { file: [] }).file.filter(visibleComment);
       if (fl.length) { var fd = el("div", { class: "flevel" }, '<div class="note">File-level comments</div>'); fl.forEach(function (c) { fd.appendChild(commentEl(c)); }); body.appendChild(fd); }
+      if (f.truncated) body.appendChild(el("div", { class: "nodiff" }, "Showing the first " + f.hunks.reduce(function (n, h) { return n + h.lines.length; }, 0) + " of " + f.total_lines + " lines."));
       if (f.binary) body.appendChild(el("div", { class: "nodiff" }, "Binary file — no textual diff."));
       else if (!f.hunks.length) body.appendChild(el("div", { class: "nodiff" }, f.status === "renamed" ? "File renamed without content changes." : "No content changes."));
       else {
