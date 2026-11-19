@@ -88,12 +88,25 @@ The report is written to `<repo>/.code-review/<branch>/report.html`. That folder
 ## How it works
 
 ```
-SKILL.md                    instructions Claude follows (review method, history, references, output)
-scripts/collect_diff.py     finds the base + merge-base, writes diff.patch / diff.json / meta.json
-scripts/history.py          git blame + log at the merge-base for the lines being changed
-references/review-schema.md the review.json format Claude writes
-scripts/render.py           checks review.json (anchors, SHAs) and builds the HTML report
-templates/report.html       the self-contained interactive report
+SKILL.md                      instructions Claude follows (method, scope, history, references, output)
+references/review-schema.md   the review.json format Claude writes
+templates/report.html         the self-contained interactive report
+
+scripts/                      thin command-line entry points
+  collect_diff.py             what to review -> diff.json / meta.json
+  history.py                  git history digest -> history.json
+  render.py                   review.json -> report.html + summary.md
+scripts/codereview/           the logic (importable, raises ReviewError instead of exiting)
+  gitcmd.py                   running git, resolving refs, repo housekeeping
+  languages.py                language detection, generated-file patterns
+  diffparse.py                unified diff -> files / hunks / lines
+  branch.py                   base-branch detection
+  scope.py                    file / range / glob scopes, "review as-is" snapshots
+  collect.py                  ties the above together into the review input
+  githistory.py               blame / log analysis of the code under review
+  review.py                   review.json validation, cited-commit checks
+  summary.py                  the summary posted in the chat
+  report.py                   HTML report generation
 ```
 
 1. `collect_diff.py` diffs `merge-base(base, head)..head`.
