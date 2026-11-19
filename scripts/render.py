@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import sys
+import urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(HERE, "..", "templates", "report.html")
@@ -126,6 +127,67 @@ def resolve_history(diff, review):
     return warnings
 
 
+def first_sentence(text, limit=220):
+    t = re.sub(r"```.*?```", "", str(text or ""), flags=re.S)
+    t = re.sub(r"\s+", " ", t).strip()
+    m = re.match(r"(.+?[.!?])(\s|$)", t)
+    t = m.group(1) if m else t
+    return t if len(t) <= limit else t[:limit - 1].rstrip() + "…"
+
+
+def terminal_summary(diff, review, report_path):
+    """Markdown summary for the chat/terminal: verdict, approach, every finding, report link."""
+    meta, summary = diff["meta"], review.get("summary") or {}
+    comments = sorted(review.get("comments") or [], key=lambda c: (SEVERITIES.index(c["severity"]),
+                                                                   c.get("file", ""), c.get("line") or 0))
+    counts = {}
+    for c in comments:
+        counts[c["severity"]] = counts.get(c["severity"], 0) + 1
+    L = ["## Code review: `%s` → `%s` — **%s**" % (meta["branch"], meta["base"],
+                                                   summary.get("verdict", "").replace("_", " ").upper())]
+    if summary.get("headline"):
+        L.append(summary["headline"])
+    L.append("")
+    L.append("%d files, +%d / -%d · %d commit(s) · %s" % (
+        meta["stats"]["files"], meta["stats"]["additions"], meta["stats"]["deletions"],
+        len(meta.get("commits") or []),
+        ", ".join("%d %s" % (counts[s], s) for s in SEVERITIES if s in counts) or "no findings"))
+    aa = summary.get("approach_assessment") or {}
+    if aa:
+        L.append("")
+        L.append("**Approach — %s:** %s" % (aa.get("rating", "n/a"), first_sentence(aa.get("analysis"))))
+        rec = [a for a in aa.get("alternatives") or [] if a.get("recommended")]
+        if rec:
+            desc = first_sentence(rec[0].get("description"))
+            L.append("**Recommended alternative:** %s%s" % (rec[0].get("title", ""), " — " + desc if desc else ""))
+    hist = summary.get("history") or {}
+    if hist.get("context"):
+        L.append("**History:** %s" % first_sentence(hist["context"], 300))
+    findings = [c for c in comments if c["severity"] != "praise"]
+    if findings:
+        L.append("")
+        L.append("### Findings")
+        L.append("")
+        L.append("| # | Severity | Location | Issue | Suggested fix |")
+        L.append("|---|---|---|---|---|")
+        for i, c in enumerate(findings, 1):
+            loc = c["file"] + (":%s" % c["line"] if c.get("line") is not None else "")
+            fix = first_sentence((c.get("suggestion") or {}).get("description") or "", 140) or \
+                ("see code in report" if (c.get("suggestion") or {}).get("code") else "")
+            cell = lambda x: str(x).replace("|", "\\|").replace("\n", " ")
+            L.append("| %d | %s | `%s` | %s | %s |" % (i, c["severity"], cell(loc), cell(c.get("title", "")), cell(fix)))
+    praise = [c for c in comments if c["severity"] == "praise"]
+    if praise:
+        L.append("")
+        L.append("**Done well:** " + "; ".join(c.get("title", "") for c in praise))
+    L.append("")
+    url = "file://" + urllib.parse.quote(os.path.abspath(report_path))
+    L.append("**Full interactive review** (diff with inline comments, reasoning, alternatives, references): [%s](%s)"
+             % (os.path.basename(report_path), url))
+    L.append("Path: `%s`" % os.path.abspath(report_path))
+    return "\n".join(L) + "\n"
+
+
 def open_file(path):
     try:
         if sys.platform == "darwin":
@@ -173,12 +235,13 @@ def main():
     with open(out, "w") as fh:
         fh.write(html)
 
-    counts = {}
-    for c in review.get("comments", []):
-        counts[c["severity"]] = counts.get(c["severity"], 0) + 1
-    print("Verdict: %s" % review["summary"]["verdict"])
-    print("Comments: " + ", ".join("%s %d" % (s, counts[s]) for s in SEVERITIES if s in counts))
+    md = terminal_summary(diff, review, out)
+    with open(os.path.join(a.dir, "summary.md"), "w") as fh:
+        fh.write(md)
     print("REPORT=%s" % os.path.abspath(out))
+    print("REPORT_URL=file://%s" % urllib.parse.quote(os.path.abspath(out)))
+    print("----- SUMMARY (relay this to the user) -----")
+    print(md)
     if not a.no_open:
         open_file(os.path.abspath(out))
 

@@ -152,8 +152,10 @@ python3 ${CLAUDE_SKILL_DIR}/scripts/render.py --dir <OUT_DIR> [--no-open]
 If it reports JSON or validation errors, fix `review.json` and re-run. If it warns that a
 comment's line is not in the diff, re-check the anchor and fix it if it was a mistake.
 
-## Step 7 — Report back in the terminal
+## Step 7 — Return the review in the chat
 
-Keep it short: verdict + headline, counts by severity, the top 3 issues as
-`file:line — title`, the recommended alternative approach (one line), and the full path to the
-HTML report. Do not paste the whole review into the terminal.
+`render.py` prints a `SUMMARY` block (also saved as `<OUT_DIR>/summary.md`). Your final message
+must contain that summary in full: the verdict, approach rating, recommended alternative, history
+note, the table of **all** findings with `file:line`, and the link to the HTML report. Copy it
+as printed. Don't shorten the findings table or drop the link. You may add up to 3 sentences on
+the most important thing to fix first. Don't paste the full comment bodies, which are in the report.

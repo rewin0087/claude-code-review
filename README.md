@@ -50,6 +50,8 @@ Inside Claude Code:
 
 You can also ask in plain words, e.g. *"review this with history"*.
 
+When the review finishes, Claude posts a summary in the chat (terminal or VS Code): the verdict, the approach rating, the recommended alternative, history notes, a table of **every** finding with `file:line`, and a link to the full interactive report. The same summary is saved as `summary.md`.
+
 The report is written to `<repo>/.code-review/<branch>/report.html`. That folder is added to the repo's local `.git/info/exclude`, so it never gets committed.
 
 ### Report keyboard shortcuts
