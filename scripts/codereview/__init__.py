@@ -1,4 +1,4 @@
-"""Business logic for the code-review skill.
+"""Business logic for the branch-review skill.
 
 The scripts in the parent directory (collect_diff.py, history.py, render.py) are thin
 command-line wrappers around this package:

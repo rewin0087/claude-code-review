@@ -75,7 +75,7 @@ def describe_commit(repo, sha):
     return out.split("\x1f") if out else None
 
 
-def ensure_ignored(repo, entry=".code-review/"):
+def ensure_ignored(repo, entry=".branch-review/"):
     """Keep review output out of commits without touching the tracked .gitignore."""
     git_dir = git(["rev-parse", "--git-common-dir"], repo).strip()
     exclude = os.path.join(git_dir if os.path.isabs(git_dir) else os.path.join(repo, git_dir), "info", "exclude")

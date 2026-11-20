@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [2.0.0] - 2026-11-20
+
+### Changed (breaking)
+- Renamed the command from `/code-review` to **`/branch-review`**, so it no longer hides Claude
+  Code's built-in `/code-review` (or clashes with the official `code-review` plugin). The plugin is
+  now `branch-review@rewin0087`, run as `/branch-review:branch-review`. Standalone installs go in
+  `~/.claude/skills/branch-review`. The GitHub repo keeps its name.
+- The output folder is now `.branch-review/<branch>/` (it was `.code-review/`).
+
+### Added
+- README: "How it compares" with the built-in `/code-review` and the official plugin.
+
+### Upgrading
+- Plugin: `claude plugin uninstall code-review@rewin0087`, then `claude plugin marketplace update rewin0087`
+  and `claude plugin install branch-review@rewin0087`.
+- Standalone: `mv ~/.claude/skills/code-review ~/.claude/skills/branch-review`.
+- Old `.code-review/` folders in your repos can be deleted.
+
 ## [1.1.0] - 2026-11-20
 
 ### Added
@@ -51,3 +69,4 @@ First public release.
 
 [1.0.0]: https://github.com/rewin0087/claude-code-review/releases/tag/v1.0.0
 [1.1.0]: https://github.com/rewin0087/claude-code-review/compare/v1.0.0...v1.1.0
+[2.0.0]: https://github.com/rewin0087/claude-code-review/compare/v1.1.0...v2.0.0

@@ -152,12 +152,12 @@ def collect(opts):
 
 
 def output_dir(repo, branch, scopes):
-    """<repo>/.code-review/<branch>[__<scope>] — scoped runs don't overwrite the full review."""
+    """<repo>/.branch-review/<branch>[__<scope>] — scoped runs don't overwrite the full review."""
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", branch).strip("-") or "HEAD"
     if scopes:
         tag = re.sub(r"[^A-Za-z0-9]+", "-", "_".join(sc["spec"] for sc in scopes)).strip("-")[:40]
         slug += "__" + (tag or "scope")
-    return os.path.join(repo, ".code-review", slug)
+    return os.path.join(repo, ".branch-review", slug)
 
 
 def write_collection(c, out_dir):

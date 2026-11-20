@@ -3,7 +3,7 @@
 
 Diffs merge-base(base, head)..head so commits that landed on the base branch after you
 branched off are NOT included. With --path, narrows to files / line ranges / globs and
-reviews unchanged code as-is. Writes to <repo>/.code-review/<branch>[__<scope>]/:
+reviews unchanged code as-is. Writes to <repo>/.branch-review/<branch>[__<scope>]/:
 
   diff.patch   raw unified diff
   diff.json    parsed diff + meta (used by history.py and render.py)

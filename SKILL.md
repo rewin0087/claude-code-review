@@ -1,9 +1,9 @@
 ---
-name: code-review
+name: branch-review
 description: Review ONLY the changes introduced by the current git branch (merge-base..HEAD), or a specific file / line range / folder / editor selection, in any tech stack. Checks the code against supplied requirements (ticket text, docs, images, links), validates the approach and business logic, looks for reusable existing code, runs security/dependency scanners, analyses performance and memory (with optional benchmarks), uses git history, lists impact and caveats, and opens an interactive HTML report with the review inline on the diff.
 argument-hint: "[path[:start-end] ...] [--req <file|url|text> ...] [--selection|--file|--all] [repo-dir] [base-branch] [--head <branch>] [--uncommitted] [--history] [--bench|--no-bench] [--no-scan] [--focus <area>] [--no-open] [-- requirements text]"
 disable-model-invocation: true
-allowed-tools: Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/*) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(git blame *) Bash(git rev-parse *) Bash(git merge-base *) Bash(git ls-files *) Bash(git status *) Bash(git -C *) Bash(git grep *) Bash(ls *) Read Grep Glob WebSearch WebFetch Agent Edit(**/.code-review/**)
+allowed-tools: Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/*) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(git blame *) Bash(git rev-parse *) Bash(git merge-base *) Bash(git ls-files *) Bash(git status *) Bash(git -C *) Bash(git grep *) Bash(ls *) Read Grep Glob WebSearch WebFetch Agent Edit(**/.branch-review/**)
 ---
 
 # Branch code review
@@ -56,7 +56,7 @@ Pick the scope in this order, then say which one you chose in one line before st
      file **and line range** (`<path>:<start>-<end>`).
    - `--file`, or the user says "this file", "the open file" → scope to that whole file.
    - With no flag and no such words: if a **selection** (a highlighted line range) is present, scope to
-     it, because highlighting is a deliberate signal. Say so, and tell the user `/code-review --all`
+     it, because highlighting is a deliberate signal. Say so, and tell the user `/branch-review --all`
      reviews the whole branch. An open file **without** a selection is not a signal (the IDE always
      reports one), so ignore it and review the whole branch.
    - `--selection` / `--file` but no such context → tell the user nothing is selected or open,

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>claude-code-review: AI code review for Claude Code (/code-review)</title>
-<meta name="description" content="/code-review is a free, open-source AI code review skill and plugin for Claude Code. It reviews your git branch's changes in any stack against your ticket and requirements, finds reusable code, runs security scanners, flags memory and performance issues, lists caveats, and opens an interactive HTML diff report.">
+<title>claude-code-review: AI code review for Claude Code (/branch-review)</title>
+<meta name="description" content="/branch-review is a free, open-source AI code review skill and plugin for Claude Code. It reviews your git branch's changes in any stack against your ticket and requirements, finds reusable code, runs security scanners, flags memory and performance issues, lists caveats, and opens an interactive HTML diff report.">
 <meta name="keywords" content="Claude Code code review, AI code review, Claude Code skill, Claude Code plugin, code reviewer, pull request review, git branch review, Anthropic Claude">
 <link rel="canonical" href="https://rewin0087.github.io/claude-code-review/">
 <meta name="robots" content="index,follow">
@@ -29,14 +29,14 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "claude-code-review",
-  "alternateName": "/code-review for Claude Code",
+  "alternateName": "/branch-review for Claude Code",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "macOS, Linux",
   "description": "An AI code review skill and plugin for Claude Code. It reviews only a git branch's changes, or a selected file or line range, in any tech stack. It validates the approach, cites web references, uses git history, and renders an interactive HTML diff report.",
   "url": "https://rewin0087.github.io/claude-code-review/",
   "downloadUrl": "https://github.com/rewin0087/claude-code-review",
   "codeRepository": "https://github.com/rewin0087/claude-code-review",
-  "softwareVersion": "1.1.0",
+  "softwareVersion": "2.0.0",
   "license": "https://opensource.org/licenses/MIT",
   "isAccessibleForFree": true,
   "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
@@ -59,8 +59,10 @@
      "acceptedAnswer": {"@type": "Answer", "text": "Yes. Pass a ticket, spec, PDF, Word doc, mockup image, link or plain text with --req, or after --. It builds a requirements checklist, marks each item met, partial, missing or contradicted with evidence, and checks that the required tools and APIs are used correctly."}},
     {"@type": "Question", "name": "Is my code sent to search engines?",
      "acceptedAnswer": {"@type": "Answer", "text": "No. Web searches use generic technical terms only. Your code, names, secrets and hostnames are never put into search queries."}},
-    {"@type": "Question", "name": "Why is the plugin command /code-review:code-review?",
-     "acceptedAnswer": {"@type": "Answer", "text": "Claude Code namespaces plugin commands as plugin:skill. To type plain /code-review, install it as a standalone skill by cloning it into ~/.claude/skills/code-review."}}
+    {"@type": "Question", "name": "How is it different from Claude Code's built-in /code-review?",
+     "acceptedAnswer": {"@type": "Answer", "text": "The built-in command is a fast correctness-bug pass with effort levels, --fix, PR comments and an ultra cloud mode. /branch-review is a broader local review of your branch against your ticket, with approach alternatives, sources, git history, scanners, performance and memory checks, impact and caveats, and an interactive HTML report. Use both."}},
+    {"@type": "Question", "name": "Why is the plugin command /branch-review:branch-review?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Claude Code namespaces plugin commands as plugin:skill. To type plain /branch-review, install it as a standalone skill by cloning it into ~/.claude/skills/branch-review."}}
   ]
 }
 </script>
@@ -208,7 +210,7 @@ footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space
   <div class="wrap">
     <span class="eyebrow">Claude Code skill + plugin · free &amp; open source</span>
     <h1>AI code review for <span class="grad">your git branch</span>, inside Claude Code</h1>
-    <p class="lede">Run <code>/code-review</code> to review your branch's changes, a file, or the code you've highlighted, in any stack. It checks the code against your ticket, finds code to reuse, scans for vulnerabilities, flags memory and performance issues, lists caveats, and opens an interactive diff with the review inline.</p>
+    <p class="lede">Run <code>/branch-review</code> to review your branch's changes, a file, or the code you've highlighted, in any stack. It checks the code against your ticket, finds code to reuse, scans for vulnerabilities, flags memory and performance issues, lists caveats, and opens an interactive diff with the review inline.</p>
 
     <div class="install" id="install">
       <div class="tabs" role="tablist">
@@ -216,12 +218,12 @@ footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space
         <button class="tab" role="tab" aria-selected="false" data-pane="p2">Standalone skill</button>
       </div>
       <div class="pane on" id="p1" role="tabpanel">
-        <div class="cmd"><span class="p">›</span><code>/plugin install code-review --marketplace rewin0087/claude-code-review</code><button class="copy">Copy</button></div>
-        <div class="note">Then run <code>/code-review:code-review</code>. On versions older than 2.1.275, run <code>/plugin marketplace add rewin0087/claude-code-review</code>, then <code>/plugin install code-review@rewin0087</code>.</div>
+        <div class="cmd"><span class="p">›</span><code>/plugin install branch-review --marketplace rewin0087/claude-code-review</code><button class="copy">Copy</button></div>
+        <div class="note">Then run <code>/branch-review:branch-review</code>. On versions older than 2.1.275, run <code>/plugin marketplace add rewin0087/claude-code-review</code>, then <code>/plugin install branch-review@rewin0087</code>.</div>
       </div>
       <div class="pane" id="p2" role="tabpanel">
-        <div class="cmd"><span class="p">$</span><code>git clone https://github.com/rewin0087/claude-code-review.git ~/.claude/skills/code-review</code><button class="copy">Copy</button></div>
-        <div class="note">Then run <code>/code-review</code> in any repo. Update with <code>git -C ~/.claude/skills/code-review pull</code>.</div>
+        <div class="cmd"><span class="p">$</span><code>git clone https://github.com/rewin0087/claude-code-review.git ~/.claude/skills/branch-review</code><button class="copy">Copy</button></div>
+        <div class="note">Then run <code>/branch-review</code> in any repo. Update with <code>git -C ~/.claude/skills/branch-review pull</code>.</div>
       </div>
     </div>
     <div class="cta">
@@ -263,7 +265,7 @@ footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space
     <h2>How it works</h2>
     <p class="sub">Scripts handle the exact parts: diffs, line numbers, commits and rendering. Claude handles the judgement. Every line and commit the review cites is checked against the real repo.</p>
     <div class="steps">
-      <div class="step"><h3>Input</h3><p>Run <code>/code-review</code> on a branch, paths, line ranges or your editor selection, with optional flags.</p><span class="who">You</span></div>
+      <div class="step"><h3>Input</h3><p>Run <code>/branch-review</code> on a branch, paths, line ranges or your editor selection, with optional flags.</p><span class="who">You</span></div>
       <div class="step"><h3>Collect</h3><p>Finds the base, diffs from the merge-base, and narrows to your scope.</p><span class="who">Script</span></div>
       <div class="step"><h3>Review</h3><p>Reads full files, callers and tests. Checks git history, runs the checklist, judges the approach and researches sources.</p><span class="who">Claude</span></div>
       <div class="step"><h3>Validate</h3><p>Rejects comments on lines that aren't in the diff and commits that don't exist, then renders the report.</p><span class="who">Script</span></div>
@@ -275,25 +277,25 @@ footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space
 <section id="usage" class="alt">
   <div class="wrap">
     <h2>Usage</h2>
-    <p class="sub">Plugin installs use <code>/code-review:code-review</code>. Standalone installs use <code>/code-review</code>.</p>
+    <p class="sub">Plugin installs use <code>/branch-review:branch-review</code>. Standalone installs use <code>/branch-review</code>.</p>
     <div class="usage"><pre><span class="c"># the checked-out branch against its auto-detected base</span>
-/code-review
+/branch-review
 <span class="c"># another branch, without checking it out</span>
-/code-review --head feat/login
+/branch-review --head feat/login
 <span class="c"># a file, a line range, folders and globs</span>
-/code-review src/billing/charge.ts:40-80  src/api/  'src/**/*.sql'
+/branch-review src/billing/charge.ts:40-80  src/api/  'src/**/*.sql'
 <span class="c"># the code highlighted in VS Code / JetBrains</span>
-/code-review --selection
+/branch-review --selection
 <span class="c"># dig into git history to see why the code is the way it is</span>
-/code-review --history
+/branch-review --history
 <span class="c"># review against a ticket, spec, mockup or link</span>
-/code-review --req docs/INV-142.md --req mockups/checkout.png
+/branch-review --req docs/INV-142.md --req mockups/checkout.png
 <span class="c"># or just say what it must do</span>
-/code-review -- Amounts must be in cents. Use the pdf-service API.
+/branch-review -- Amounts must be in cents. Use the pdf-service API.
 <span class="c"># benchmark performance-sensitive changes</span>
-/code-review --bench
+/branch-review --bench
 <span class="c"># put more weight on one area</span>
-/code-review --focus security</pre></div>
+/branch-review --focus security</pre></div>
     <div class="two">
       <figure><img src="images/report-overview.png" width="1400" height="1000" loading="lazy" alt="Review summary with the verdict, severity counts, must-address list and approach assessment"><figcaption>Summary: verdict, severity counts and approach assessment</figcaption></figure>
       <figure><img src="images/report-diff.png" width="1400" height="1000" loading="lazy" alt="Diff view with inline review comments"><figcaption>Diff: inline findings with fixes and references</figcaption></figure>
@@ -311,8 +313,9 @@ footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space
       <details><summary>Can it check the code against a ticket or requirements?</summary><p>Yes. Pass a ticket, spec, PDF, Word doc, mockup image, link or plain text with <code>--req</code>, or after <code>--</code>. You can also paste them into the chat. It builds a requirements checklist, marks each item met, partial, missing or contradicted with evidence, and checks that the required tools and APIs are used correctly.</p></details>
       <details><summary>Does it run security scanners?</summary><p>It always runs a built-in secret detector. It also runs semgrep, bandit, npm audit and pip-audit if they're installed, but it never installs anything. Only findings on your changed lines count as new, and secret values are redacted.</p></details>
       <details><summary>Is my code sent to search engines?</summary><p>No. Web searches use generic technical terms only. Your code, names, secrets and hostnames never go into a search query.</p></details>
-      <details><summary>Why is the plugin command <code>/code-review:code-review</code>?</summary><p>Claude Code namespaces plugin commands as <code>plugin:skill</code>. To type plain <code>/code-review</code>, install it as a standalone skill by cloning it into <code>~/.claude/skills/code-review</code>.</p></details>
-      <details><summary>Where does the report go?</summary><p>To <code>.code-review/&lt;branch&gt;/report.html</code> in your repo. That folder is added to the repo's local <code>.git/info/exclude</code>, so it never gets committed.</p></details>
+      <details><summary>How is it different from Claude Code's built-in <code>/code-review</code>?</summary><p>The built-in command is a fast correctness-bug pass with effort levels, <code>--fix</code> and PR comments, and an <code>ultra</code> cloud mode. <code>/branch-review</code> is a broader local review of your branch: it checks against your ticket, rates the approach, suggests alternatives with sources, uses git history, runs scanners, looks at performance and memory, lists impact and caveats, and opens an interactive HTML report. Use both: <code>/branch-review</code> while you build, and <code>/code-review</code> on the PR. (It was called <code>/code-review</code> before 2.0.0.)</p></details>
+      <details><summary>Why is the plugin command <code>/branch-review:branch-review</code>?</summary><p>Claude Code namespaces plugin commands as <code>plugin:skill</code>. To type plain <code>/branch-review</code>, install it as a standalone skill by cloning it into <code>~/.claude/skills/branch-review</code>.</p></details>
+      <details><summary>Where does the report go?</summary><p>To <code>.branch-review/&lt;branch&gt;/report.html</code> in your repo. That folder is added to the repo's local <code>.git/info/exclude</code>, so it never gets committed.</p></details>
     </div>
   </div>
 </section>

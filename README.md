@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/docs-website-blue)](https://rewin0087.github.io/claude-code-review/)
 
-**`/code-review` is an AI code review skill and plugin for [Claude Code](https://claude.com/claude-code).** It reviews **only the changes your git branch introduces**, or just the file, lines or editor selection you point it at, in **any tech stack**. It checks the code against **your requirements** (a ticket, spec, mockup, link or a few lines of text), validates the approach and business logic, finds **existing code to reuse**, runs **security and dependency scanners**, analyses **performance and memory** (with optional benchmarks), suggests better alternatives **backed by web references**, uses **git history** to see why existing code was written that way, and lists the **impact and caveats** of the change. It opens an **interactive HTML report** with every review comment shown on the diff line.
+**`/branch-review` is an AI code review skill and plugin for [Claude Code](https://claude.com/claude-code).** It reviews **only the changes your git branch introduces**, or just the file, lines or editor selection you point it at, in **any tech stack**. It checks the code against **your requirements** (a ticket, spec, mockup, link or a few lines of text), validates the approach and business logic, finds **existing code to reuse**, runs **security and dependency scanners**, analyses **performance and memory** (with optional benchmarks), suggests better alternatives **backed by web references**, uses **git history** to see why existing code was written that way, and lists the **impact and caveats** of the change. It opens an **interactive HTML report** with every review comment shown on the diff line.
 
 It runs on your existing Claude Code session, in the terminal, VS Code or JetBrains. You don't need an API key, server or CI setup.
 
@@ -14,7 +14,7 @@ It runs on your existing Claude Code session, in the terminal, VS Code or JetBra
 ## Features
 
 - **Branch-only diff**: compares against the merge-base, so commits that landed on `main` after you branched are excluded. The base branch (`main`, `master`, `develop`, …) is detected automatically.
-- **Review a file, a line range or your editor selection**: highlight code in VS Code and run `/code-review`, or pass `src/app.py:40-80`, folders or globs. Unchanged code is reviewed as it is.
+- **Review a file, a line range or your editor selection**: highlight code in VS Code and run `/branch-review`, or pass `src/app.py:40-80`, folders or globs. Unchanged code is reviewed as it is.
 - **Any stack**: detects languages, frameworks and versions from the files and manifests, and fits its advice to the versions you use.
 - **Review against requirements**: pass a ticket, spec, PDF, Word doc, mockup image, link or plain text with `--req` (or after ` -- `). It turns them into a numbered checklist and marks each item met, partial, missing or contradicted, with evidence lines. It also checks that the mandated tools, APIs and data formats are used, and used correctly.
 - **Reuse and DRY**: searches the codebase for existing helpers, services and components that the change duplicates, and points to the code to reuse or extend.
@@ -29,6 +29,32 @@ It runs on your existing Claude Code session, in the terminal, VS Code or JetBra
 - **Results in the chat**: the verdict, the approach rating and a table of every finding, with a link to the report.
 - **Large diffs**: split across parallel sub-agents.
 
+## How it compares
+
+Claude Code has its own **built-in `/code-review`**, and Anthropic's plugin marketplace has an official
+**`code-review` plugin**. This skill used to be called `/code-review` too, which hid the built-in one,
+so since 2.0.0 it's **`/branch-review`**. They work well side by side:
+
+| | Built-in `/code-review` | Official `code-review` plugin | **`/branch-review`** (this repo) |
+|---|---|---|---|
+| Install | ships with Claude Code | `claude-plugins-official` marketplace | plugin or skill from this repo |
+| What it reviews | current diff, a PR, a branch or a path | a GitHub pull request | the branch's own changes (merge-base), or a file, range or editor selection, including unchanged code as-is |
+| Focus | correctness bugs, plus reuse / simplification / efficiency cleanups | bugs, CLAUDE.md compliance, git-blame context | bugs, design and approach, requirements, reuse/DRY, security, performance and memory, tests, impact |
+| Depth control | effort levels `low` → `max`, `--max-findings` | fixed: 4 parallel agents | `--focus`, `--history`, `--bench`; large diffs split across sub-agents |
+| Noise filtering | effort level / max findings | confidence score, only ≥ 80 reported | severity levels (critical → nitpick, plus praise), and a confidence on each comment |
+| Requirements / ticket check | — | CLAUDE.md rules | `--req` tickets, specs, PDFs, mockups and links → met / partial / missing checklist |
+| Approach and alternatives | — | — | approach rating, plus alternatives with pros and cons |
+| Web references | — | — | required for critical / major findings (docs, OWASP / CWE, RFCs) |
+| Git history | — | blame-based agent | blame, `log -L` / `-S`, past fixes and reverts, cited SHAs verified |
+| Scanners | — | — | secret detector, plus semgrep, bandit, npm audit and pip-audit when installed |
+| Output | findings in the chat | terminal, or a PR comment | chat summary **plus an interactive HTML report** (diff, inline comments, filters, resolve tracking, Copy MD) |
+| Acts on findings | `--fix` applies them, `--comment` posts inline PR comments | `--comment` posts a PR comment | none: you fix, then copy the Markdown into your PR |
+| Cloud | `ultra`: a multi-agent review in the cloud (billed) | — | — (runs in your session) |
+
+A good combination: run **`/branch-review`** while you build, against the ticket, with the HTML report
+to work through. Then run the built-in **`/code-review`** (or `/code-review ultra`) on the PR for a
+second, independent pass that can post comments or apply fixes.
+
 ## Install
 
 ### As a Claude Code plugin (recommended)
@@ -36,35 +62,35 @@ It runs on your existing Claude Code session, in the terminal, VS Code or JetBra
 In Claude Code (2.1.275 or later):
 
 ```text
-/plugin install code-review --marketplace rewin0087/claude-code-review
+/plugin install branch-review --marketplace rewin0087/claude-code-review
 ```
 
 Or in two steps, which works on any version with plugins:
 
 ```text
 /plugin marketplace add rewin0087/claude-code-review
-/plugin install code-review@rewin0087
+/plugin install branch-review@rewin0087
 ```
 
-From a shell: `claude plugin marketplace add rewin0087/claude-code-review && claude plugin install code-review@rewin0087`.
+From a shell: `claude plugin marketplace add rewin0087/claude-code-review && claude plugin install branch-review@rewin0087`.
 
-Claude Code namespaces plugin commands, so you run the plugin as **`/code-review:code-review`**. Update it with `claude plugin update code-review@rewin0087`.
+Claude Code namespaces plugin commands, so you run the plugin as **`/branch-review:branch-review`**. Update it with `claude plugin update branch-review@rewin0087`.
 
-### As a standalone skill (plain `/code-review`)
+### As a standalone skill (plain `/branch-review`)
 
-If you'd rather type `/code-review`, clone it as a skill. For every project:
+If you'd rather type `/branch-review`, clone it as a skill. For every project:
 
 ```bash
-git clone https://github.com/rewin0087/claude-code-review.git ~/.claude/skills/code-review
+git clone https://github.com/rewin0087/claude-code-review.git ~/.claude/skills/branch-review
 ```
 
 Or for one folder only (available when you start `claude` in that folder):
 
 ```bash
-git clone https://github.com/rewin0087/claude-code-review.git <folder>/.claude/skills/code-review
+git clone https://github.com/rewin0087/claude-code-review.git <folder>/.claude/skills/branch-review
 ```
 
-Update with `git -C ~/.claude/skills/code-review pull`.
+Update with `git -C ~/.claude/skills/branch-review pull`.
 
 > Claude Code looks for project skills from the folder where you start it up to that repo's root. If the skill is in a parent folder that holds several repos, start `claude` in the parent folder and pass the repo name (see below), or install it globally.
 
@@ -72,19 +98,19 @@ Update with `git -C ~/.claude/skills/code-review pull`.
 
 ## Usage
 
-Inside Claude Code. These examples use `/code-review`; if you installed the plugin, type `/code-review:code-review` instead:
+Inside Claude Code. These examples use `/branch-review`; if you installed the plugin, type `/branch-review:branch-review` instead:
 
 ```text
-/code-review                              # review the checked-out branch against its base
-/code-review my-repo                      # review a repo inside the current folder
-/code-review my-repo --head feat/login    # review another branch without checking it out
-/code-review develop                      # set the base branch yourself
-/code-review --uncommitted                # include staged and unstaged changes
-/code-review --history                    # deep git-history investigation
-/code-review --focus security             # put more weight on one area
-/code-review --bench                      # benchmark performance-sensitive changes
-/code-review --no-scan                    # skip the automated scanners
-/code-review --no-open                    # don't open the browser
+/branch-review                              # review the checked-out branch against its base
+/branch-review my-repo                      # review a repo inside the current folder
+/branch-review my-repo --head feat/login    # review another branch without checking it out
+/branch-review develop                      # set the base branch yourself
+/branch-review --uncommitted                # include staged and unstaged changes
+/branch-review --history                    # deep git-history investigation
+/branch-review --focus security             # put more weight on one area
+/branch-review --bench                      # benchmark performance-sensitive changes
+/branch-review --no-scan                    # skip the automated scanners
+/branch-review --no-open                    # don't open the browser
 ```
 
 You can also ask in plain words, e.g. *"review this with history"*.
@@ -92,33 +118,33 @@ You can also ask in plain words, e.g. *"review this with history"*.
 ### Review against requirements, tickets and docs
 
 ```text
-/code-review --req docs/INV-142.md                      # a spec or ticket export (md, txt, pdf, docx…)
-/code-review --req mockups/checkout.png --req specs/api.pdf
-/code-review --req https://github.com/org/repo/issues/42 # a link (fetched; private pages may need pasting)
-/code-review -- Amounts must be in cents. Use the pdf-service API, not wkhtmltopdf.
+/branch-review --req docs/INV-142.md                      # a spec or ticket export (md, txt, pdf, docx…)
+/branch-review --req mockups/checkout.png --req specs/api.pdf
+/branch-review --req https://github.com/org/repo/issues/42 # a link (fetched; private pages may need pasting)
+/branch-review -- Amounts must be in cents. Use the pdf-service API, not wkhtmltopdf.
 ```
 
-You can also paste a screenshot or ticket text into the chat and then run `/code-review`. It uses those too. The report then shows a **Requirements** table with each item's status and evidence, plus the sources you gave.
+You can also paste a screenshot or ticket text into the chat and then run `/branch-review`. It uses those too. The report then shows a **Requirements** table with each item's status and evidence, plus the sources you gave.
 
 ### Review specific files, lines or the editor selection
 
 ```text
-/code-review src/billing/charge.ts            # one file
-/code-review src/billing/charge.ts:40-80      # a line range (also :40 or #L40-L80)
-/code-review src/billing/ 'src/**/*.sql'      # folders and globs
-/code-review @src/app.py                      # Claude Code @-mentions work too
-/code-review --selection                      # the code highlighted in VS Code / JetBrains
-/code-review --file                           # the file open in the editor
-/code-review --all                            # ignore the editor; review the whole branch
+/branch-review src/billing/charge.ts            # one file
+/branch-review src/billing/charge.ts:40-80      # a line range (also :40 or #L40-L80)
+/branch-review src/billing/ 'src/**/*.sql'      # folders and globs
+/branch-review @src/app.py                      # Claude Code @-mentions work too
+/branch-review --selection                      # the code highlighted in VS Code / JetBrains
+/branch-review --file                           # the file open in the editor
+/branch-review --all                            # ignore the editor; review the whole branch
 ```
 
-- In the IDE, **highlighted code is used automatically**: highlight lines, run `/code-review`, and only that selection is reviewed. An open file with nothing highlighted is ignored unless you pass `--file` or say "review this file".
+- In the IDE, **highlighted code is used automatically**: highlight lines, run `/branch-review`, and only that selection is reviewed. An open file with nothing highlighted is ignored unless you pass `--file` or say "review this file".
 - If the branch changed code inside the scope, those changes are reviewed. If it didn't (or you're on `main`), the **current code is reviewed as-is**. Mixed scopes do both, file by file. `--changes-only` / `--as-is` force one mode.
 - Scoped reviews include uncommitted edits, so line numbers match your editor. Each scope gets its own report folder, so it doesn't overwrite the full-branch report.
 
 When the review finishes, Claude posts a summary in the chat (terminal or VS Code): the verdict, the approach rating, the recommended alternative, history notes, a table of **every** finding with `file:line`, and a link to the full interactive report. The same summary is saved as `summary.md`.
 
-The report is written to `<repo>/.code-review/<branch>/report.html`. That folder is added to the repo's local `.git/info/exclude`, so it never gets committed.
+The report is written to `<repo>/.branch-review/<branch>/report.html`. That folder is added to the repo's local `.git/info/exclude`, so it never gets committed.
 
 ### Report keyboard shortcuts
 
@@ -142,7 +168,7 @@ The report is written to `<repo>/.code-review/<branch>/report.html`. That folder
 ```mermaid
 flowchart TD
     subgraph IN["1 - Input"]
-        A1["Run /code-review<br/>whole branch"]
+        A1["Run /branch-review<br/>whole branch"]
         A2["Paths and ranges<br/>src/app.py:40-80, src/, globs"]
         A3["Editor selection or open file<br/>VS Code, JetBrains"]
         A4["Flags<br/>--head, --base, --history, --focus"]
@@ -225,7 +251,7 @@ sequenceDiagram
     participant W as Web
     participant R as HTML report
 
-    You->>CC: /code-review [paths] [flags], or highlight code first
+    You->>CC: /branch-review [paths] [flags], or highlight code first
     CC->>S: collect_diff.py
     S->>G: merge-base, diff, ls-files
     G-->>S: branch changes or current code
@@ -329,7 +355,7 @@ Syntax highlighting loads highlight.js from cdnjs. Without internet the report s
 
 ## Contributing
 
-Issues and pull requests are welcome. If `/code-review` helped you catch a bug, a ⭐ on GitHub helps other developers find it.
+Issues and pull requests are welcome. If `/branch-review` helped you catch a bug, a ⭐ on GitHub helps other developers find it.
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
