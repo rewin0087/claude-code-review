@@ -187,6 +187,34 @@ tr.insc td.code:last-child { box-shadow: inset 3px 0 0 var(--accent); }
 tr.insc.hl td.code:last-child { box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 999px rgba(255, 214, 0, .16); }
 .scopenote { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; margin: 8px 0; font-size: 13px; }
 .insc-demo { color: var(--accent); font-weight: 700; }
+.cov { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--panel-2); margin: 6px 0 4px; }
+.cov > span { display: block; height: 100%; }
+.covlegend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+.covlegend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
+table.grid { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.grid th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+table.grid td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+table.grid tr:last-child td { border-bottom: 0; }
+table.grid td .md p { margin: 0 0 4px; }
+.st { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: #fff; white-space: nowrap; line-height: 19px; text-transform: uppercase; letter-spacing: .02em; }
+.st-met, .st-pass { background: var(--praise); } .st-partial, .st-warn { background: var(--minor); }
+.st-missing, .st-contradicted, .st-fail { background: var(--critical); } .st-unclear, .st-not_applicable, .st-info { background: var(--nitpick); }
+.st-ran { background: var(--praise); } .st-missing-tool, .st-skipped { background: var(--nitpick); } .st-error, .st-timeout { background: var(--major); }
+.ev { font-family: var(--mono); font-size: 12px; display: inline-block; margin: 1px 6px 1px 0; }
+.ev.bad { color: var(--muted); text-decoration: line-through; }
+.chiplink { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; margin-right: 4px; cursor: pointer; color: var(--accent); background: var(--panel); }
+.sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 6px; align-items: start; }
+.src { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--panel-2); font-size: 13px; min-width: 0; }
+.src b { font-family: var(--mono); font-size: 11.5px; color: var(--muted); margin-right: 6px; }
+.src .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.src img { display: block; max-width: 100%; max-height: 140px; margin-top: 6px; border-radius: 6px; border: 1px solid var(--border); object-fit: contain; background: var(--panel); }
+.imp h4 { margin: 12px 0 4px; font-size: 13px; }
+.imp .breaking { border-left: 3px solid var(--critical); padding-left: 10px; }
+.reuse { border: 1px dashed var(--accent); border-radius: 8px; padding: 8px 12px; background: var(--accent-soft); }
+.reuse .loc { font-family: var(--mono); font-size: 12px; }
+.tag.req { color: var(--accent); border-color: var(--accent); cursor: pointer; }
+tr.flash td { animation: flash 1.6s ease-out; }
+@keyframes flash { from { box-shadow: inset 0 0 0 999px rgba(124, 149, 255, .35); } to { box-shadow: none; } }
 .hist { list-style: none; margin: 4px 0; padding: 0; font-size: 13px; border-left: 2px solid var(--border); }
 .hist li { position: relative; padding: 3px 0 3px 14px; }
 .hist li::before { content: ""; position: absolute; left: -5px; top: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
@@ -433,11 +461,20 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
       '<span class="ctitle">' + inline(c.title || "") + "</span>" +
       (c.category ? '<span class="tag">' + esc(c.category) + "</span>" : "") +
       (c.confidence ? '<span class="tag" title="Reviewer confidence">' + esc(c.confidence) + " confidence</span>" : "") +
+      (c.requirements || []).map(function (r) { return '<span class="tag req" data-req="' + esc(r) + '" title="Linked requirement">' + esc(r) + "</span>"; }).join("") +
       "</div><div class='cbody'>";
     if (c._unanchored) h += '<div class="note" style="font-size:12px;color:var(--muted)">Line ' + esc(c.line) + " (" + esc(c.side) + ") is outside the changed hunks.</div>";
     h += md(c.body, lang);
     if (c.reasoning) h += '<details class="sec"><summary>Reasoning</summary>' + md(c.reasoning, lang) + "</details>";
     if (c.history && c.history.length) h += '<div class="sec"><div class="lbl">History — why this code exists</div>' + historyHtml(c.history) + "</div>";
+    if (c.reuse && c.reuse.file) {
+      var ru = c.reuse, rloc = ru.file + (ru.line ? ":" + ru.line : "");
+      h += '<div class="sec reuse"><div class="lbl">Reuse existing code' + (ru._missing ? " (not found in repo)" : "") + "</div>" +
+        '<div class="loc">' + (ru.symbol ? "<b>" + esc(ru.symbol) + "</b> · " : "") +
+        (META.repo_path && !ru._missing ? '<a href="vscode://file/' + encodeURI(META.repo_path + "/" + ru.file) + (ru.line ? ":" + ru.line : "") + '">' + esc(rloc) + "</a>" : esc(rloc)) +
+        (fileByPath[ru.file] ? ' · <a href="#" data-gotoline="' + esc(ru.file) + "|" + esc(ru.line || "") + '">show in diff</a>' : "") + "</div>" +
+        md(ru.description, (fileByPath[ru.file] || {}).language) + "</div>";
+    }
     if (c.suggestion && (c.suggestion.description || c.suggestion.code)) {
       h += '<div class="sec"><div class="lbl">Suggested fix</div>' + md(c.suggestion.description, lang) + (c.suggestion.code ? codeBlock(c.suggestion.code, lang) : "") + "</div>";
     }
@@ -460,11 +497,93 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
   function commentMd(c) {
     var s = "### [" + (SEV_LABEL[c.severity] || c.severity) + "] " + c.title + "\n`" + c.file + (c.line != null ? ":" + c.line : "") + "`" + (c.category ? " · " + c.category : "") + "\n\n" + (c.body || "") + "\n";
     if (c.reasoning) s += "\n**Reasoning:** " + c.reasoning + "\n";
+    if (c.reuse && c.reuse.file) s += "\n**Reuse:** `" + c.reuse.file + (c.reuse.line ? ":" + c.reuse.line : "") + "`" + (c.reuse.symbol ? " (" + c.reuse.symbol + ")" : "") + " — " + (c.reuse.description || "") + "\n";
+    if (c.requirements && c.requirements.length) s += "\n**Requirements:** " + c.requirements.join(", ") + "\n";
     if (c.history && c.history.length) s += "\n**History:**\n" + c.history.map(function (x) { return "- `" + (x.short || x.sha) + "` " + (x.subject || "") + (x.note ? " — " + x.note : ""); }).join("\n") + "\n";
     if (c.suggestion) { s += "\n**Suggested fix:** " + (c.suggestion.description || "") + "\n"; if (c.suggestion.code) s += "\n```" + (c.suggestion.language || "") + "\n" + c.suggestion.code + "\n```\n"; }
     (c.alternatives || []).forEach(function (a) { s += "\n**Alternative — " + a.title + ":** " + (a.description || "") + "\n"; });
     if (c.references && c.references.length) s += "\n" + c.references.map(function (r) { return "- [" + (r.title || r.url) + "](" + r.url + ")" + (r.note ? " — " + r.note : ""); }).join("\n") + "\n";
     return s;
+  }
+
+  // ---------- requirements / impact / checks ----------
+  var REQ_COLORS = { met: "var(--praise)", partial: "var(--minor)", missing: "var(--critical)", contradicted: "var(--critical)", unclear: "var(--nitpick)", not_applicable: "var(--border)" };
+  function locLink(file, line, bad) {
+    var t = esc(file + (line ? ":" + line : ""));
+    return bad ? '<span class="ev bad" title="Not part of this review">' + t + "</span>" : '<a href="#" class="ev" data-gotoline="' + esc(file) + "|" + esc(line || "") + '">' + t + "</a>";
+  }
+  function sourcesHtml(sources) {
+    if (!sources || !sources.length) return "";
+    return '<div class="sources">' + sources.map(function (sc) {
+      var title = esc(sc.title || sc.source || sc.url || ""), body;
+      if (sc.url) body = '<a class="t" href="' + esc(safeUrl(sc.url) || "#") + '" target="_blank" rel="noopener">' + title + "</a>";
+      else if (sc.path) body = '<a class="t" href="' + esc(sc.path) + '" target="_blank">' + title + "</a>";
+      else body = '<span class="t">' + title + "</span>";
+      return '<div class="src"><b>' + esc(sc.id || "") + "</b>" + '<span class="tag">' + esc(sc.type || sc.kind || "") + "</span>" + body +
+        (sc.type === "image" && sc.path ? '<img src="' + esc(sc.path) + '" alt="' + title + '" loading="lazy">' : "") + "</div>";
+    }).join("") + "</div>";
+  }
+  function requirementsCard() {
+    var rq = SUMMARY.requirements || {}, items = rq.items || [];
+    var sources = (META.context && META.context.sources) || rq.sources || [];
+    if (!items.length && !sources.length) return "";
+    var counts = {}; items.forEach(function (i) { counts[i.status] = (counts[i.status] || 0) + 1; });
+    var order = ["met", "partial", "missing", "contradicted", "unclear", "not_applicable"];
+    var h = '<div class="card" id="rqCard"><header><h2>Requirements</h2><span class="tag">' + (counts.met || 0) + "/" + items.length + " met</span></header><div class='body'>";
+    if (items.length) {
+      h += '<div class="cov">' + order.filter(function (s) { return counts[s]; }).map(function (s) { return '<span style="width:' + (100 * counts[s] / items.length) + "%;background:" + REQ_COLORS[s] + '" title="' + s + '"></span>'; }).join("") + "</div>";
+      h += '<div class="covlegend">' + order.filter(function (s) { return counts[s]; }).map(function (s) { return "<span><i style='background:" + REQ_COLORS[s] + "'></i>" + counts[s] + " " + s.replace("_", " ") + "</span>"; }).join("") + "</div>";
+    }
+    if (rq.coverage_note) h += md(rq.coverage_note);
+    if (items.length) {
+      h += '<table class="grid"><thead><tr><th>ID</th><th>Requirement</th><th>Status</th><th>Evidence</th></tr></thead><tbody>' + items.map(function (it) {
+        return '<tr id="req-' + esc(it.id) + '"><td><code>' + esc(it.id) + "</code>" + (it.source ? '<div class="tag" style="margin-top:4px">' + esc(it.source) + "</div>" : "") + "</td>" +
+          "<td>" + md(it.text) + (it.notes ? '<div style="color:var(--muted);font-size:12.5px">' + inline(it.notes) + "</div>" : "") + "</td>" +
+          '<td><span class="st st-' + esc(it.status) + '">' + esc(String(it.status || "").replace("_", " ")) + "</span></td>" +
+          "<td>" + (it.evidence || []).map(function (ev) { return locLink(ev.file, ev.line, ev._unanchored) + (ev.note ? '<span style="color:var(--muted);font-size:12px">' + inline(ev.note) + "</span><br>" : ""); }).join("") +
+          (it.comments || []).map(function (cid) { var c = COMMENTS.filter(function (x) { return x.id === cid; })[0]; return '<span class="chiplink" data-goto="' + esc(cid) + '" title="' + esc(c ? c.title : "") + '">' + esc(cid) + "</span>"; }).join("") + "</td></tr>";
+      }).join("") + "</tbody></table>";
+    }
+    if (sources.length) h += "<h3>Sources provided</h3>" + sourcesHtml(sources);
+    return h + "</div></div>";
+  }
+  function impactCard() {
+    var im = SUMMARY.impact || {};
+    var parts = [["breaking_changes", "Breaking changes"], ["caveats", "Caveats"], ["considerations", "Things to consider"], ["affected_areas", "Affected areas"]];
+    if (!parts.some(function (p) { return im[p[0]] && im[p[0]].length; }) && !im.rollout) return "";
+    var h = '<div class="card imp" id="imCard"><header><h2>Impact &amp; caveats</h2>' + (im.breaking_changes && im.breaking_changes.length ? '<span class="st st-fail">' + im.breaking_changes.length + " breaking</span>" : "") + "</header><div class='body'>";
+    parts.forEach(function (p) { if (im[p[0]] && im[p[0]].length) h += '<div class="' + (p[0] === "breaking_changes" ? "breaking" : "") + '"><h4>' + p[1] + "</h4>" + md(im[p[0]]) + "</div>"; });
+    if (im.rollout) h += "<h4>Rollout &amp; migration</h4>" + md(im.rollout);
+    return h + "</div></div>";
+  }
+  function checksCard() {
+    var checks = SUMMARY.checks || [], scan = META.scan;
+    if (!checks.length && !scan) return "";
+    var h = '<div class="card" id="ckCard"><header><h2>Analysis &amp; automated checks</h2></header><div class="body">';
+    if (checks.length) {
+      h += '<table class="grid"><thead><tr><th>Check</th><th>Status</th><th>Result</th></tr></thead><tbody>' + checks.map(function (ch) {
+        return "<tr><td><b>" + inline(ch.name || "") + "</b>" + (ch.kind ? '<div class="tag" style="margin-top:4px">' + esc(ch.kind) + "</div>" : "") + "</td>" +
+          '<td><span class="st st-' + esc(ch.status) + '">' + esc(ch.status || "") + "</span></td><td>" + md(ch.result) +
+          (ch.details ? "<details class='sec'><summary>Details</summary>" + md(ch.details) + "</details>" : "") + "</td></tr>";
+      }).join("") + "</tbody></table>";
+    }
+    if (scan) {
+      var on = (scan.findings || []).filter(function (f) { return f.on_change; }), off = (scan.findings || []).filter(function (f) { return !f.on_change; });
+      h += "<h3>Scanners <span style='text-transform:none;letter-spacing:0;font-weight:400'>· " + esc(scan.source || "") + "</span></h3>" +
+        '<div class="chips" style="margin-bottom:8px">' + (scan.tools || []).map(function (tl) {
+          var cls = tl.status === "missing" ? "missing-tool" : tl.status;
+          return '<span class="chip" title="' + esc(tl.note || "") + '"><span class="st st-' + esc(cls) + '">' + esc(tl.status) + "</span> " + esc(tl.tool) + (tl.status === "ran" ? " · " + tl.findings : "") + "</span>";
+        }).join("") + "</div>";
+      var row = function (f) {
+        var sevCls = { high: "critical", medium: "major", low: "minor", info: "nitpick" }[f.severity] || "nitpick";
+        return '<tr><td><span class="badge sev-' + sevCls + '">' + esc(f.severity) + "</span></td><td>" + (f.line ? locLink(f.file, f.line) : '<span class="ev">' + esc(f.file) + "</span>") + "</td><td><code>" + esc(f.tool) + "</code> " + esc(f.rule || "") + "<div>" + esc(f.message || "") + "</div>" +
+          (safeUrl(f.url) ? '<a href="' + esc(f.url) + '" target="_blank" rel="noopener" style="font-size:12px">rule details</a>' : "") + "</td></tr>";
+      };
+      var tbl = function (list) { return '<table class="grid"><thead><tr><th>Severity</th><th>Location</th><th>Finding</th></tr></thead><tbody>' + list.map(row).join("") + "</tbody></table>"; };
+      h += on.length ? "<p style='margin:4px 0'><b>" + on.length + "</b> finding(s) on the changed lines. Real issues are triaged into review comments above.</p>" + tbl(on) : "<p style='margin:4px 0;color:var(--muted)'>No scanner findings on the changed lines.</p>";
+      if (off.length) h += "<details class='sec'><summary>" + off.length + " pre-existing finding(s) in the same files</summary>" + tbl(off) + "</details>";
+    }
+    return h + "</div></div>";
   }
 
   // ---------- overview ----------
@@ -495,6 +614,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
     }
     h += "</div></div>";
 
+    h += requirementsCard() + impactCard() + checksCard();
     var hist = SUMMARY.history;
     if (hist && (hist.context || (hist.timeline && hist.timeline.length))) {
       h += '<div class="card" id="hiCard"><header><h2>History &amp; rationale</h2><span class="tag">git history</span></header><div class="body">' +
@@ -677,6 +797,18 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
     var n = document.getElementById("c-" + c.id); if (n) { n.classList.remove("min"); focusComment(n); }
     closeSidebarMobile();
   }
+  function gotoLine(path, line) {
+    var b = document.getElementById(slug(path));
+    if (!b) { toast(path + " is not part of this review"); return; }
+    collapsed[path] = false; b.classList.remove("collapsed");
+    var col = state.view === "split" ? 3 : 2, row = null;
+    if (line) $$("td.num:nth-child(" + col + ")", b).forEach(function (td) { if (!row && td.textContent === String(line)) row = td.parentNode; });
+    if (!row && line) $$("td.num", b).forEach(function (td) { if (!row && td.textContent === String(line)) row = td.parentNode; });
+    var target = row || b;
+    target.scrollIntoView({ block: row ? "center" : "start", behavior: "smooth" });
+    if (row) { row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash"); }
+    closeSidebarMobile();
+  }
   function gotoFile(path) {
     var b = document.getElementById(slug(path)); if (!b) return;
     collapsed[path] = false; b.classList.remove("collapsed");
@@ -750,6 +882,10 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
       s += "## Approach (" + (aa.rating || "") + ")\n\n" + (aa.analysis || "") + "\n\n";
       (aa.alternatives || []).forEach(function (a) { s += "### Alternative: " + a.title + (a.recommended ? " (recommended)" : "") + "\n\n" + (a.description || "") + "\n\n"; });
     }
+    var rqs = (SUMMARY.requirements || {}).items || [];
+    if (rqs.length) s += "## Requirements\n\n| ID | Requirement | Status |\n|---|---|---|\n" + rqs.map(function (r) { return "| " + r.id + " | " + String(r.text || "").replace(/\|/g, "\\|").replace(/\n/g, " ") + " | " + r.status + " |"; }).join("\n") + "\n\n";
+    var imp = SUMMARY.impact || {};
+    ["breaking_changes", "caveats", "considerations"].forEach(function (k) { if (imp[k] && imp[k].length) s += "## " + k.replace("_", " ").replace(/^./, function (x) { return x.toUpperCase(); }) + "\n\n" + imp[k].map(function (x) { return "- " + x; }).join("\n") + "\n\n"; });
     if (SUMMARY.history && SUMMARY.history.context) s += "## History & rationale\n\n" + SUMMARY.history.context + "\n\n";
     s += "## Comments\n\n";
     COMMENTS.slice().sort(function (a, b) { return sevRank(a.severity) - sevRank(b.severity); }).forEach(function (c) { s += commentMd(c) + "\n"; });
@@ -762,6 +898,8 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
     var cp = t.closest("[data-copy]"); if (cp) { copy(cp.parentNode.querySelector("code").textContent); return; }
     var go = t.closest("[data-goto]"); if (go) { gotoComment(go.getAttribute("data-goto")); return; }
     var fi = t.closest("[data-file]"); if (fi) { gotoFile(fi.getAttribute("data-file")); return; }
+    var gl = t.closest("[data-gotoline]"); if (gl) { e.preventDefault(); var pl = gl.getAttribute("data-gotoline").split("|"); gotoLine(pl[0], pl[1] ? +pl[1] : null); return; }
+    var rq = t.closest("[data-req]"); if (rq) { var rr = document.getElementById("req-" + rq.getAttribute("data-req")); if (rr) { $("#rqCard").classList.remove("collapsed"); rr.scrollIntoView({ block: "center", behavior: "smooth" }); rr.classList.remove("flash"); void rr.offsetWidth; rr.classList.add("flash"); } return; }
     var sj = t.closest("[data-sevjump]"); if (sj) { var c0 = COMMENTS.filter(function (c) { return c.severity === sj.getAttribute("data-sevjump"); })[0]; if (c0) gotoComment(c0.id); return; }
     var chip = t.closest("[data-sev]"); if (chip) { var s = chip.getAttribute("data-sev"); state.sevOff[s] = !state.sevOff[s]; renderAll(true); return; }
     var tab = t.closest("[data-tab]"); if (tab) { state.tab = tab.getAttribute("data-tab"); $$("[data-tab]").forEach(function (b) { b.classList.toggle("active", b === tab); }); renderSide(); return; }

@@ -1,7 +1,7 @@
 ---
 name: code-review
-description: Review ONLY the changes introduced by the current git branch (merge-base..HEAD), or a specific file / line range / folder / editor selection, in any tech stack, use git history to understand why existing code was written that way, validate the approach, propose better/alternative approaches backed by web references, and open an interactive HTML report showing the diff with the review comments inline.
-argument-hint: "[path[:start-end] ...] [--selection|--file|--all] [repo-dir] [base-branch] [--head <branch>] [--uncommitted] [--history] [--focus <area>] [--no-open]"
+description: Review ONLY the changes introduced by the current git branch (merge-base..HEAD), or a specific file / line range / folder / editor selection, in any tech stack. Checks the code against supplied requirements (ticket text, docs, images, links), validates the approach and business logic, looks for reusable existing code, runs security/dependency scanners, analyses performance and memory (with optional benchmarks), uses git history, lists impact and caveats, and opens an interactive HTML report with the review inline on the diff.
+argument-hint: "[path[:start-end] ...] [--req <file|url|text> ...] [--selection|--file|--all] [repo-dir] [base-branch] [--head <branch>] [--uncommitted] [--history] [--bench|--no-bench] [--no-scan] [--focus <area>] [--no-open] [-- requirements text]"
 disable-model-invocation: true
 allowed-tools: Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/*) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(git blame *) Bash(git rev-parse *) Bash(git merge-base *) Bash(git ls-files *) Bash(git status *) Bash(git -C *) Bash(git grep *) Bash(ls *) Read Grep Glob WebSearch WebFetch Agent Edit(**/.code-review/**)
 ---
@@ -30,7 +30,18 @@ Parse the arguments:
 - `--uncommitted` = also review staged/unstaged working-tree changes
 - `--history` = do a deep git-history investigation (Step 2b is mandatory and thorough). The
   user may also ask for this in words ("review with history", "check why it was done this way").
-- `--focus <area>` = weight the review toward that area (e.g. security, performance) — still report anything critical
+- `--req <file|url|text>` (repeatable; aliases `--ticket`, `--spec`, `--context`) = requirements and
+  context to review against: a ticket or spec file (txt, md, pdf, docx…), an image (mockup,
+  diagram, screenshot), a URL (ticket, design doc, API docs), or quoted free text.
+- everything after a standalone ` -- ` = free-text requirements / instructions / caveats.
+- Also treat as requirements: images or files the user attached or pasted in the conversation,
+  `@`-mentioned documents that aren't code under review, and requirement-like instructions written
+  in the user's message ("it must…", acceptance criteria, a todo list). If unsure whether an
+  `@file` is code to review or a spec, a `.md/.txt/.pdf/.docx/image` outside the diff is a spec.
+- `--bench` = always benchmark the performance-sensitive code (Step 3b); `--no-bench` = never run benchmarks.
+- `--no-scan` = skip the automated scanners (Step 2c). When turning a scanner finding into a
+  comment, its rule or advisory URL from `scan.json` counts as a reference.
+- `--focus <area>` = (e.g. security, performance) — still report anything critical
 - `--no-open` = don't open the browser at the end
 
 ### Scope — what to review
@@ -80,6 +91,36 @@ is a different branch: read files with `git -C <root> show <head_ref>:<path>` in
 grep with `git -C <root> grep <pattern> <head_ref>`. It diffs from the merge-base, so
 only this branch's own changes are included. Note the `OUT_DIR=` line. If it exits with an
 error (not a repo, no changes, base not found), tell the user the message and stop.
+
+## Step 1b — Gather requirements and context (when any were given)
+
+Collect every requirement source from the arguments and the conversation (see `--req` above).
+Pasted or typed text goes in as a quoted `--source` string. Then run:
+
+```bash
+python3 ${CLAUDE_SKILL_DIR}/scripts/context.py --dir <OUT_DIR> --cwd <current dir> \
+    --source <file|url|"text"> [--source ...]
+```
+
+It copies files and text into `<OUT_DIR>/context/`, records them in `context.json` as S1, S2, …
+and prints text sources inline. Then:
+- **Read** every file under `READ_FILES` (images and PDFs). Look at mockups and diagrams carefully:
+  field names, states, error messages, flows.
+- **WebFetch** every URL under `FETCH_URLS`. Tickets and private docs often need a login. If a
+  fetch fails or returns a login page, say so in one line and ask the user to paste the content.
+  Don't guess what the ticket says. For GitHub/GitLab issue links, `gh issue view <url>` or
+  `glab issue view <url>` may work if installed and logged in.
+- Images the user pasted directly in the chat are already visible to you. Note them as a source
+  in `summary.requirements.coverage_note` (they can't be copied into the report).
+
+Distil the sources into a numbered checklist, `summary.requirements.items` R1, R2, …, one
+testable statement each, citing its source id. Include: acceptance criteria and business rules;
+**mandated tools, libraries, APIs, endpoints, data formats and versions** ("use the pdf-service
+API", "amounts in cents"); non-functional requirements (performance budgets, security, a11y);
+edge cases; and caveats the ticket mentions. Never put ticket or business content into web
+searches.
+
+With no requirement sources, skip this step and infer intent from the code and commits as usual.
 
 **Reviewing code as-is** (files with status `snapshot`, mode `code` or `mixed`): there is no diff,
 so review the selected lines (marked `"s": 1` in diff.json; the extra lines around them are
@@ -144,10 +185,37 @@ Use what you learn:
 - Write `summary.history` (context + timeline). Only cite SHAs you actually saw. `render.py`
   checks every SHA against the repo.
 
+## Step 2c — Automated checks (unless `--no-scan`)
+
+```bash
+python3 ${CLAUDE_SKILL_DIR}/scripts/scan.py --dir <OUT_DIR>
+```
+
+It always runs a built-in secret detector, then any installed scanners: semgrep, bandit,
+npm audit, pip-audit. It never installs anything. Findings are split into **on the change** and
+**pre-existing**. Triage the on-change findings: turn real ones into review comments (cite the
+tool and rule, and link the rule URL in `references`) and ignore false positives. Mention
+pre-existing ones only if the change makes them worse. The report shows all scanner results in
+its own section. If useful scanners for the stack are missing, mention it in one line in the
+checks (e.g. "semgrep not installed").
+
 ## Step 3 — Review
 
 Apply this checklist to every change, adapting to the stack:
 
+- **Requirements and business logic** (when Step 1b ran): check every R-item against the code.
+  Set its status: `met`, `partial`, `missing`, `contradicted` (the code does the opposite),
+  `unclear` (the requirement is ambiguous) or `not_applicable`. Point to `evidence` lines and link
+  the comments that explain gaps. Check that the **mandated tools, APIs, libraries and data
+  formats** are the ones used, and that they're used correctly: verify the API usage (endpoint,
+  parameters, auth, error codes, pagination, idempotency) against the official docs for that API
+  and version. Flag behaviour the requirements didn't ask for (scope creep) and requirements that
+  conflict with each other.
+- **Reuse and DRY**: before accepting new helpers, utilities, components, queries, validations or
+  constants, **search the codebase** (Grep/Glob on names, key strings and similar logic) for an
+  existing implementation to reuse or extend. Also look for duplication inside the change. Report
+  it with category `duplication` and a `reuse` pointer to the existing code (`file`, `line`,
+  `symbol`, how to use it). If the existing code needs a small extension to fit, say what.
 - **Correctness**: logic errors, off-by-one, null/undefined/nil, wrong conditions, unhandled
   states, timezone/encoding, integer/float issues, broken contracts with callers you found.
 - **Security**: injection (SQL/command/template/XSS), authN/authZ gaps and IDOR, secrets in code,
@@ -158,7 +226,16 @@ Apply this checklist to every change, adapting to the stack:
 - **Concurrency & reliability**: races, idempotency, retries, timeouts, resource leaks,
   error handling and failure modes of external calls.
 - **Performance**: algorithmic complexity on realistic data sizes, unnecessary work in loops,
-  memory, caching, bundle size for frontend.
+  N+1 queries, blocking I/O on hot paths, caching, bundle size for frontend. See Step 3b.
+- **Memory and resource leaks**: unbounded caches, maps and lists that only grow; listeners,
+  subscriptions, observers, intervals and timers not removed (`useEffect` without cleanup,
+  `addEventListener` without `removeEventListener`); unclosed files, sockets, DB connections,
+  cursors and streams (missing `with`/`try-finally`/`using`/`defer`/`ensure`); goroutines, threads
+  or promises that never finish; closures capturing large objects; temp files never deleted;
+  global or singleton state that accumulates per request.
+- **Vulnerabilities and dependencies**: new or upgraded dependencies with known CVEs (from
+  Step 2c, or check the advisory database), abandoned packages, too-loose version ranges, licence
+  changes, and insecure defaults.
 - **Design**: does it fit the existing architecture, right layer/responsibility, coupling,
   duplication of existing helpers, public API shape, naming.
 - **Tests**: are new behaviours and edge cases tested; do tests assert the right thing.
@@ -171,6 +248,38 @@ Rules for a high-signal review:
 - Each non-praise comment gets a `suggestion` with real code that fits this codebase, and —
   where there is a meaningfully different design — `alternatives` with trade-offs.
 - Don't flag what a linter/formatter in the repo already enforces. Quality over quantity.
+
+## Step 3b — Performance analysis and benchmarks
+
+Do a **static analysis** for every performance-sensitive change (loops over data, queries, hot
+paths, serialisation, rendering): complexity, data sizes, allocations, I/O. Record the result in
+`summary.checks` (kind `performance` or `memory`).
+
+**Benchmark** when `--bench` was passed, or when a change is clearly performance-sensitive *and* can
+be measured in isolation (pure functions, algorithms, parsing, queries against an in-memory
+fixture). Don't benchmark with `--no-bench`. Rules:
+- Write a throwaway script under `<OUT_DIR>/bench/` in the repo's own language that imports or
+  copies the function(s). Compare the old version (from the merge-base, `git show`) with the new
+  version, or the current version with your suggested alternative, on realistic input sizes, with
+  several runs and a warm-up.
+- **Never modify the repo**, start servers, call external services or the network, touch real
+  databases, or install packages. Keep each run under ~60 seconds. Running it asks the user for
+  permission, which is expected.
+- Record each benchmark in `summary.checks` (kind `benchmark`): the result in `result`, and the
+  command and numbers in `details`. If you can't run one (missing runtime or dependencies), say
+  so and fall back to static analysis.
+
+## Step 3c — Impact and caveats
+
+Always fill `summary.impact`, so the developer knows the consequences of the change:
+- `breaking_changes`: API/contract/schema/config/behaviour changes that break callers, clients,
+  other services, stored data or the mobile/web apps. Name who is affected.
+- `caveats`: things that are true *after* merging and easy to miss: data migrations, rotating a
+  leaked secret, cache invalidation, feature-flag cleanup, rate limits, cost.
+- `considerations`: what to check or decide before shipping: edge cases, rollout order,
+  monitoring, docs, follow-up tickets.
+- `affected_areas`: modules, services, endpoints, screens and jobs this touches.
+- `rollout`: how to ship it safely (flags, migrations order, backfill, rollback plan), if relevant.
 
 ## Step 4 — Validate the approach and back it with references
 
@@ -203,15 +312,18 @@ correct `side` and line number from the diff.
 python3 ${CLAUDE_SKILL_DIR}/scripts/render.py --dir <OUT_DIR> [--no-open]
 ```
 
-If it reports JSON or validation errors, fix `review.json` and re-run. Treat every WARNING as a
-to-do and fix it before finishing: a comment's line not in the diff (re-check the anchor), a
-cited commit that doesn't exist, or a critical/major finding or alternative without a reference
-(do the web research, then re-run).
+If it reports JSON or validation errors, fix `review.json` and re-run. If the output ends with
+**ACTION REQUIRED**, you are not done: fix each warning, re-run `render.py`, and repeat (at most
+two more times). Only then reply. Any warning you couldn't fix goes in your reply. Warnings cover: a comment's line not in the diff (re-check the anchor), a
+cited commit that doesn't exist, a critical/major finding or alternative without a reference
+(do the web research, then re-run), a requirement marked partial/missing/contradicted without a
+linked comment or notes, or a `reuse` pointer to a file that doesn't exist.
 
 ## Step 7 — Return the review in the chat
 
 `render.py` prints a `SUMMARY` block (also saved as `<OUT_DIR>/summary.md`). Your final message
 must contain that summary in full: the verdict, approach rating, recommended alternative, history
-note, the table of **all** findings with `file:line`, and the link to the HTML report. Copy it
+note, requirements coverage, breaking changes and caveats, automated checks, the table of **all**
+findings with `file:line`, and the link to the HTML report. Copy it
 as printed. Don't shorten the findings table or drop the link. You may add up to 3 sentences on
 the most important thing to fix first. Don't paste the full comment bodies, which are in the report.

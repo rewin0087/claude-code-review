@@ -44,6 +44,13 @@ def main(argv=None):
         review = load_json(os.path.join(a.dir, "review.json"), "review.json")
     except ReviewError as e:
         sys.exit("render.py: " + str(e))
+    for name, key in (("context.json", "context"), ("scan.json", "scan")):
+        extra = os.path.join(a.dir, name)
+        if os.path.exists(extra):
+            try:
+                diff["meta"][key] = load_json(extra, name)
+            except ReviewError as e:
+                print("WARNING: ignoring " + str(e))
     errors, warnings = validate(diff, review)
     warnings += resolve_history(diff, review)
     for w in warnings:
@@ -68,6 +75,12 @@ def main(argv=None):
     print("REPORT_URL=%s" % file_url(out))
     print("----- SUMMARY (relay this to the user) -----")
     print(md)
+    if warnings:
+        print("----- ACTION REQUIRED: %d warning(s) -----" % len(warnings))
+        for w in warnings:
+            print("  - " + w)
+        print("Fix these in review.json and run render.py again before replying. "
+              "If one can't be fixed (e.g. no web access), list it in your reply.")
     if not a.no_open:
         open_file(out)
 

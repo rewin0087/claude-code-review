@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>claude-code-review: AI code review for Claude Code (/code-review)</title>
-<meta name="description" content="/code-review is a free, open-source AI code review skill and plugin for Claude Code. It reviews only your git branch's changes in any tech stack, validates the approach, cites official docs, uses git history, and opens an interactive HTML diff report.">
+<meta name="description" content="/code-review is a free, open-source AI code review skill and plugin for Claude Code. It reviews your git branch's changes in any stack against your ticket and requirements, finds reusable code, runs security scanners, flags memory and performance issues, lists caveats, and opens an interactive HTML diff report.">
 <meta name="keywords" content="Claude Code code review, AI code review, Claude Code skill, Claude Code plugin, code reviewer, pull request review, git branch review, Anthropic Claude">
 <link rel="canonical" href="https://rewin0087.github.io/claude-code-review/">
 <meta name="robots" content="index,follow">
@@ -36,7 +36,7 @@
   "url": "https://rewin0087.github.io/claude-code-review/",
   "downloadUrl": "https://github.com/rewin0087/claude-code-review",
   "codeRepository": "https://github.com/rewin0087/claude-code-review",
-  "softwareVersion": "1.0.0",
+  "softwareVersion": "1.1.0",
   "license": "https://opensource.org/licenses/MIT",
   "isAccessibleForFree": true,
   "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
@@ -55,6 +55,8 @@
      "acceptedAnswer": {"@type": "Answer", "text": "Any. It detects the stack and framework versions from the files and manifests, such as package.json, Gemfile, go.mod and pyproject.toml, and fits its advice to those versions."}},
     {"@type": "Question", "name": "Does it review the whole repository?",
      "acceptedAnswer": {"@type": "Answer", "text": "No. By default it reviews only the changes your branch introduces since it split from its base branch. You can also point it at a file, a line range, a folder, or the code highlighted in your editor."}},
+    {"@type": "Question", "name": "Can it check the code against a ticket or requirements?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Yes. Pass a ticket, spec, PDF, Word doc, mockup image, link or plain text with --req, or after --. It builds a requirements checklist, marks each item met, partial, missing or contradicted with evidence, and checks that the required tools and APIs are used correctly."}},
     {"@type": "Question", "name": "Is my code sent to search engines?",
      "acceptedAnswer": {"@type": "Answer", "text": "No. Web searches use generic technical terms only. Your code, names, secrets and hostnames are never put into search queries."}},
     {"@type": "Question", "name": "Why is the plugin command /code-review:code-review?",
@@ -206,7 +208,7 @@ footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space
   <div class="wrap">
     <span class="eyebrow">Claude Code skill + plugin · free &amp; open source</span>
     <h1>AI code review for <span class="grad">your git branch</span>, inside Claude Code</h1>
-    <p class="lede">Run <code>/code-review</code> to review only your branch's changes, a file, or the code you've highlighted, in any tech stack. It validates the approach, suggests better alternatives backed by official docs, checks git history to see why the code exists, and opens an interactive diff with the review inline.</p>
+    <p class="lede">Run <code>/code-review</code> to review your branch's changes, a file, or the code you've highlighted, in any stack. It checks the code against your ticket, finds code to reuse, scans for vulnerabilities, flags memory and performance issues, lists caveats, and opens an interactive diff with the review inline.</p>
 
     <div class="install" id="install">
       <div class="tabs" role="tablist">
@@ -239,12 +241,18 @@ footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space
     <div class="grid">
       <div class="card"><div class="ic">⎇</div><h3>Only your branch's changes</h3><p>Diffs from the merge-base, so commits that landed on <code>main</code> after you branched are left out. The base branch is detected automatically.</p></div>
       <div class="card"><div class="ic">⌖</div><h3>Files, lines or a selection</h3><p>Highlight code in VS Code and run it, or pass <code>app.py:40-80</code>, folders or globs. Unchanged code is reviewed as it is.</p></div>
+      <div class="card"><div class="ic">☑</div><h3>Checked against your ticket</h3><p>Pass a ticket, spec, PDF, mockup, link or plain text. Every requirement is marked met, partial, missing or contradicted, with evidence lines.</p></div>
+      <div class="card"><div class="ic">♻</div><h3>Reuse, not rewrite</h3><p>Searches your codebase for existing helpers and services the change duplicates, and points to the code to reuse or extend.</p></div>
+      <div class="card"><div class="ic">⛨</div><h3>Security &amp; dependency scans</h3><p>Built-in secret detection, plus semgrep, bandit, npm audit and pip-audit when installed. Only findings on your change are flagged as new.</p></div>
+      <div class="card"><div class="ic">⏱</div><h3>Performance &amp; memory</h3><p>Flags leaks and hot-path costs, and benchmarks performance-sensitive code in a throwaway script when it matters.</p></div>
+      <div class="card"><div class="ic">⚠</div><h3>Impact &amp; caveats</h3><p>Breaking changes, things to consider before shipping, affected areas and a rollout plan, so nothing surprises you after merge.</p></div>
       <div class="card"><div class="ic">◎</div><h3>Approach validation</h3><p>Rates the solution from sound to flawed, then proposes alternatives with pros, cons and a recommendation.</p></div>
       <div class="card"><div class="ic">↗</div><h3>Backed by references</h3><p>Major findings cite official docs, OWASP/CWE, RFCs or open-source code. It only cites links it opened, and your code never goes into a search.</p></div>
       <div class="card"><div class="ic">⟲</div><h3>Git history: why it's like this</h3><p>Blames the lines you change and finds past fixes, reverts and workarounds, so a cleanup doesn't bring an old bug back.</p></div>
       <div class="card"><div class="ic">{ }</div><h3>Any tech stack</h3><p>Detects languages, frameworks and versions from your files and manifests, and fits its advice to the versions you use.</p></div>
       <div class="card"><div class="ic">▤</div><h3>Interactive report</h3><p>Unified or split diff, filters, search, resolve tracking, Open in VS Code, commit links, keyboard shortcuts and dark mode.</p></div>
       <div class="card"><div class="ic">✎</div><h3>Results in the chat</h3><p>A verdict, the approach rating and a table of every finding, with a link to the full report and Copy as Markdown for your PR.</p></div>
+      <div class="card"><div class="ic">⇶</div><h3>Large diffs, in parallel</h3><p>Big branches are split into file groups and reviewed by parallel sub-agents, then merged into one review.</p></div>
       <div class="card"><div class="ic">⚑</div><h3>No setup</h3><p>Runs in the Claude Code session you already use, in the terminal, VS Code or JetBrains. No API key, server or CI.</p></div>
     </div>
   </div>
@@ -278,6 +286,12 @@ footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space
 /code-review --selection
 <span class="c"># dig into git history to see why the code is the way it is</span>
 /code-review --history
+<span class="c"># review against a ticket, spec, mockup or link</span>
+/code-review --req docs/INV-142.md --req mockups/checkout.png
+<span class="c"># or just say what it must do</span>
+/code-review -- Amounts must be in cents. Use the pdf-service API.
+<span class="c"># benchmark performance-sensitive changes</span>
+/code-review --bench
 <span class="c"># put more weight on one area</span>
 /code-review --focus security</pre></div>
     <div class="two">
@@ -294,6 +308,8 @@ footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space
       <details><summary>Does it need an API key or a server?</summary><p>No. It runs inside your existing Claude Code session in the terminal, VS Code or JetBrains, with local Python scripts and git.</p></details>
       <details><summary>Which languages and frameworks does it support?</summary><p>Any. It detects the stack and framework versions from your files and manifests (<code>package.json</code>, <code>Gemfile</code>, <code>go.mod</code>, <code>pyproject.toml</code>, …) and fits its advice to those versions.</p></details>
       <details><summary>Does it review the whole repository?</summary><p>No. By default it reviews only the changes your branch introduces since it split from its base branch. You can also point it at a file, a line range, a folder, or the code highlighted in your editor.</p></details>
+      <details><summary>Can it check the code against a ticket or requirements?</summary><p>Yes. Pass a ticket, spec, PDF, Word doc, mockup image, link or plain text with <code>--req</code>, or after <code>--</code>. You can also paste them into the chat. It builds a requirements checklist, marks each item met, partial, missing or contradicted with evidence, and checks that the required tools and APIs are used correctly.</p></details>
+      <details><summary>Does it run security scanners?</summary><p>It always runs a built-in secret detector. It also runs semgrep, bandit, npm audit and pip-audit if they're installed, but it never installs anything. Only findings on your changed lines count as new, and secret values are redacted.</p></details>
       <details><summary>Is my code sent to search engines?</summary><p>No. Web searches use generic technical terms only. Your code, names, secrets and hostnames never go into a search query.</p></details>
       <details><summary>Why is the plugin command <code>/code-review:code-review</code>?</summary><p>Claude Code namespaces plugin commands as <code>plugin:skill</code>. To type plain <code>/code-review</code>, install it as a standalone skill by cloning it into <code>~/.claude/skills/code-review</code>.</p></details>
       <details><summary>Where does the report go?</summary><p>To <code>.code-review/&lt;branch&gt;/report.html</code> in your repo. That folder is added to the repo's local <code>.git/info/exclude</code>, so it never gets committed.</p></details>

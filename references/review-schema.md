@@ -29,6 +29,36 @@ Write exactly one JSON object to `<OUT_DIR>/review.json`. All string fields that
     "strengths": ["markdown bullet", "..."],
     "risks": ["markdown bullet — the things most likely to break in production", "..."],
     "test_assessment": "markdown — are the changes tested? what's missing?",
+    "requirements": {                              // include when requirement sources were given (Step 1b)
+      "coverage_note": "markdown — which sources were used, anything that couldn't be read",
+      "items": [
+        {
+          "id": "R1",
+          "source": "S1",                          // id from context.json (or "chat" for pasted content)
+          "text": "markdown — one testable requirement",
+          "status": "met | partial | missing | contradicted | unclear | not_applicable",
+          "evidence": [ { "file": "app/invoice.py", "line": 12, "note": "where it's (not) satisfied" } ],
+          "comments": ["c2"],                      // comments that explain a gap; required when not met
+          "notes": "optional markdown"
+        }
+      ]
+    },
+    "impact": {                                    // always include (Step 3c)
+      "breaking_changes": ["markdown — what breaks, for whom"],
+      "caveats": ["markdown — true after merging and easy to miss"],
+      "considerations": ["markdown — check or decide before shipping"],
+      "affected_areas": ["markdown"],
+      "rollout": "markdown — how to ship safely (optional)"
+    },
+    "checks": [                                    // analysis results (Step 3b) — not scanner output
+      {
+        "name": "Benchmark: invoice_total, 10k lines",
+        "kind": "benchmark | performance | memory | security | other",
+        "status": "pass | warn | fail | info",
+        "result": "markdown — the conclusion with numbers",
+        "details": "markdown — command, code, raw numbers (optional)"
+      }
+    ],
     "history": {                                   // optional; include when Step 2b ran
       "context": "markdown — why the existing code was written that way, and whether this branch's reason for changing it holds up",
       "timeline": [
@@ -45,7 +75,7 @@ Write exactly one JSON object to `<OUT_DIR>/review.json`. All string fields that
       "end_line": 47,                              // optional, for multi-line ranges (same side)
       "side": "new",                               // "new" (added/context lines) or "old" (deleted lines)
       "severity": "critical | major | minor | suggestion | nitpick | praise",
-      "category": "bug | regression | security | performance | design | correctness | concurrency | error-handling | testing | readability | maintainability | best-practice | accessibility | api-design | data",
+      "category": "bug | regression | security | requirements | duplication | memory | dependency | performance | design | correctness | concurrency | error-handling | testing | readability | maintainability | best-practice | accessibility | api-design | data",
       "confidence": "high | medium | low",
       "title": "Short imperative headline",
       "body": "markdown — what is wrong and the concrete impact (inputs/state -> wrong outcome)",
@@ -58,6 +88,11 @@ Write exactly one JSON object to `<OUT_DIR>/review.json`. All string fields that
       "alternatives": [
         { "title": "...", "description": "markdown", "code": "optional", "language": "optional" }
       ],
+      "requirements": ["R1"],                      // optional: requirement ids this comment is about
+      "reuse": {                                   // optional: existing code to reuse or extend (DRY)
+        "file": "app/money.py", "line": 4, "symbol": "format_currency(amount_cents, currency)",
+        "description": "markdown — how to use or extend it here"
+      },
       "history": [                                 // optional: commits that explain this code's past
         { "sha": "a1b2c3d", "subject": "Fix double charge on retry", "note": "why this guard exists" }
       ],
@@ -90,6 +125,15 @@ Write exactly one JSON object to `<OUT_DIR>/review.json`. All string fields that
   moves comments whose line is not in the diff to the file-level section and warns.
 - Prefer anchoring on the first line of the problematic statement.
 - Use `line: null` for comments about the file as a whole (e.g. "this file needs tests").
+
+## Requirements, reuse and checks rules
+
+- Every requirement with status `partial`, `missing` or `contradicted` must link a comment
+  (`comments`) or explain the gap in `notes`.
+- `evidence` and `reuse.line` use current (new-side) line numbers. `evidence` must point at lines in
+  the review. `reuse.file` may be anywhere in the repo, and must exist.
+- Scanner output is shown by the report automatically from `scan.json`. Don't copy it into
+  `checks`; turn real findings into comments instead.
 
 ## History rules
 

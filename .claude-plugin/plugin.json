@@ -1,7 +1,7 @@
 {
   "name": "code-review",
   "displayName": "Code Review",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "AI code review for Claude Code. Reviews only your branch's changes (or a file, range or editor selection) in any tech stack, checks the approach, cites web references, uses git history, and opens an interactive HTML report.",
   "author": {
     "name": "rewin0087",

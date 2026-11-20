@@ -87,3 +87,13 @@ def ensure_ignored(repo, entry=".code-review/"):
                 fh.write(("" if existing.endswith("\n") or not existing else "\n") + entry + "\n")
     except OSError:
         pass
+
+
+def path_exists(repo, rev, path):
+    """True if path exists at rev (or in the working tree when rev is None)."""
+    if not path:
+        return False
+    if rev is None:
+        return os.path.exists(os.path.join(repo, path))
+    return subprocess.run(["git", "cat-file", "-e", "%s:%s" % (rev, path)], cwd=repo,
+                          capture_output=True).returncode == 0

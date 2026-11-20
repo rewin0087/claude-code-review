@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/docs-website-blue)](https://rewin0087.github.io/claude-code-review/)
 
-**`/code-review` is an AI code review skill and plugin for [Claude Code](https://claude.com/claude-code).** It reviews **only the changes your git branch introduces**, or just the file, lines or editor selection you point it at, in **any tech stack**. It validates the approach, suggests better alternatives **backed by web references**, uses **git history** to see why existing code was written that way, and opens an **interactive HTML report** with every review comment shown on the diff line.
+**`/code-review` is an AI code review skill and plugin for [Claude Code](https://claude.com/claude-code).** It reviews **only the changes your git branch introduces**, or just the file, lines or editor selection you point it at, in **any tech stack**. It checks the code against **your requirements** (a ticket, spec, mockup, link or a few lines of text), validates the approach and business logic, finds **existing code to reuse**, runs **security and dependency scanners**, analyses **performance and memory** (with optional benchmarks), suggests better alternatives **backed by web references**, uses **git history** to see why existing code was written that way, and lists the **impact and caveats** of the change. It opens an **interactive HTML report** with every review comment shown on the diff line.
 
 It runs on your existing Claude Code session, in the terminal, VS Code or JetBrains. You don't need an API key, server or CI setup.
 
@@ -16,6 +16,11 @@ It runs on your existing Claude Code session, in the terminal, VS Code or JetBra
 - **Branch-only diff**: compares against the merge-base, so commits that landed on `main` after you branched are excluded. The base branch (`main`, `master`, `develop`, …) is detected automatically.
 - **Review a file, a line range or your editor selection**: highlight code in VS Code and run `/code-review`, or pass `src/app.py:40-80`, folders or globs. Unchanged code is reviewed as it is.
 - **Any stack**: detects languages, frameworks and versions from the files and manifests, and fits its advice to the versions you use.
+- **Review against requirements**: pass a ticket, spec, PDF, Word doc, mockup image, link or plain text with `--req` (or after ` -- `). It turns them into a numbered checklist and marks each item met, partial, missing or contradicted, with evidence lines. It also checks that the mandated tools, APIs and data formats are used, and used correctly.
+- **Reuse and DRY**: searches the codebase for existing helpers, services and components that the change duplicates, and points to the code to reuse or extend.
+- **Automated checks**: a built-in secret detector, plus semgrep, bandit, npm audit and pip-audit when installed. Findings on the changed lines are separated from pre-existing ones, and secrets are redacted.
+- **Performance and memory**: static analysis of hot paths and a per-stack memory-leak checklist. When it matters, or with `--bench`, a throwaway benchmark runs in the output folder, never in your repo.
+- **Impact and caveats**: breaking changes, caveats, things to consider, affected areas and a rollout plan.
 - **Approach validation**: infers what the change is trying to do and rates the approach (sound / acceptable / questionable / flawed). It proposes alternative approaches with pros and cons and marks one as recommended.
 - **Reasoned comments**: each comment has a severity, category, confidence, a concrete failure scenario, its reasoning, a suggested fix with code, and alternatives.
 - **Web references**: every critical or major finding cites official docs, OWASP/CWE, RFCs or well-known open-source code. It may only cite links it actually opened, and its searches never include your code.
@@ -77,10 +82,23 @@ Inside Claude Code. These examples use `/code-review`; if you installed the plug
 /code-review --uncommitted                # include staged and unstaged changes
 /code-review --history                    # deep git-history investigation
 /code-review --focus security             # put more weight on one area
+/code-review --bench                      # benchmark performance-sensitive changes
+/code-review --no-scan                    # skip the automated scanners
 /code-review --no-open                    # don't open the browser
 ```
 
 You can also ask in plain words, e.g. *"review this with history"*.
+
+### Review against requirements, tickets and docs
+
+```text
+/code-review --req docs/INV-142.md                      # a spec or ticket export (md, txt, pdf, docx…)
+/code-review --req mockups/checkout.png --req specs/api.pdf
+/code-review --req https://github.com/org/repo/issues/42 # a link (fetched; private pages may need pasting)
+/code-review -- Amounts must be in cents. Use the pdf-service API, not wkhtmltopdf.
+```
+
+You can also paste a screenshot or ticket text into the chat and then run `/code-review`. It uses those too. The report then shows a **Requirements** table with each item's status and evidence, plus the sources you gave.
 
 ### Review specific files, lines or the editor selection
 
@@ -128,6 +146,7 @@ flowchart TD
         A2["Paths and ranges<br/>src/app.py:40-80, src/, globs"]
         A3["Editor selection or open file<br/>VS Code, JetBrains"]
         A4["Flags<br/>--head, --base, --history, --focus"]
+        A5["Requirements<br/>--req files, images, links, text"]
     end
 
     subgraph COLLECT["2 - Collect: deterministic scripts"]
@@ -136,6 +155,8 @@ flowchart TD
         B3["git diff merge-base..head<br/>only this branch's changes"]
         B4["Snapshot unchanged code<br/>to review it as-is"]
         B5[("diff.json + meta.json")]
+        B6["context.py<br/>collect the requirement sources"]
+        B7["scan.py<br/>secrets, semgrep, bandit,<br/>npm audit, pip-audit"]
     end
 
     subgraph AI["3 - AI review: Claude Code"]
@@ -143,8 +164,10 @@ flowchart TD
         C8["Parallel subagents<br/>one per file group"]
         C2{"Existing code changed<br/>or --history?"}
         C3["Git history<br/>blame, log -L, log -S<br/>why the code exists"]
-        C4["Review checklist<br/>correctness, security, data,<br/>concurrency, performance,<br/>design, tests"]
-        C5["Validate the approach<br/>rate it, propose alternatives"]
+        C9["Requirements checklist<br/>R1, R2 ... from the sources"]
+        C4["Review checklist<br/>requirements, business logic,<br/>reuse / DRY, security, memory,<br/>performance, design, tests"]
+        C10["Benchmarks when needed<br/>throwaway, in the output folder"]
+        C5["Validate the approach<br/>rate it, propose alternatives,<br/>impact and caveats"]
         C6["Web research<br/>official docs, OWASP / CWE,<br/>RFCs, open-source code"]
         C7[("review.json")]
     end
@@ -156,12 +179,15 @@ flowchart TD
     end
 
     subgraph OUT["5 - Outcome"]
-        E1["Verdict<br/>approve, approve with suggestions,<br/>or request changes"]
+        E1["Verdict<br/>requirements coverage,<br/>impact and caveats"]
         E2["Inline findings<br/>fix, reasoning, alternatives,<br/>references, history"]
         E3["You act<br/>fix code, resolve comments,<br/>Open in VS Code, Copy MD to the PR"]
     end
 
     A1 & A2 & A3 & A4 --> B1
+    A5 --> B6 --> C9 --> C4
+    B5 --> B7 --> C4
+    C4 -. perf-sensitive .-> C10 -.-> C5
     B1 --> B2 --> B3 --> B5
     B1 --> B4 --> B5
     B5 --> C1
@@ -181,7 +207,7 @@ flowchart TD
 | Stage | Who does it | Output |
 |---|---|---|
 | **1. Input** | You: a command, paths, an editor selection, flags | what to review |
-| **2. Collect** | `collect_diff.py`: deterministic, no AI | `diff.json`, `meta.json` |
+| **2. Collect** | `collect_diff.py`, `context.py`, `scan.py`: deterministic, no AI | `diff.json`, `context.json`, `scan.json` |
 | **3. AI review** | Claude Code, guided by `SKILL.md` | `review.json` |
 | **4. Validate and render** | `render.py`: checks every line anchor and commit SHA | `report.html`, `summary.md` |
 | **5. Outcome** | You, in the chat and the browser | fixes, resolved comments, PR notes |
@@ -204,7 +230,13 @@ sequenceDiagram
     S->>G: merge-base, diff, ls-files
     G-->>S: branch changes or current code
     S-->>CC: diff.json and an overview
-    CC->>G: read changed files, callers and tests
+    opt requirements given with --req, after --, or pasted
+        CC->>S: context.py
+        S-->>CC: ticket and spec text, images and links to open
+    end
+    CC->>S: scan.py
+    S-->>CC: secrets and scanner findings on the change
+    CC->>G: read changed files, callers and tests, search for reusable code
     opt existing code changed, or --history
         CC->>S: history.py
         S->>G: blame and log at the merge-base
@@ -212,7 +244,7 @@ sequenceDiagram
     end
     CC->>W: search docs, OWASP, open-source projects
     W-->>CC: references
-    CC->>CC: review and approach assessment, write review.json
+    CC->>CC: requirements check, review, impact, write review.json
     CC->>S: render.py
     S-->>R: report.html
     S-->>CC: summary.md
@@ -275,6 +307,8 @@ templates/report.html         the self-contained interactive report
 scripts/                      thin command-line entry points
   collect_diff.py             what to review -> diff.json / meta.json
   history.py                  git history digest -> history.json
+  context.py                  requirement sources -> context/ + context.json
+  scan.py                     secret detector + installed scanners -> scan.json
   render.py                   review.json -> report.html + summary.md
 scripts/codereview/           the logic (importable, raises ReviewError instead of exiting)
   gitcmd.py                   running git, resolving refs, repo housekeeping
@@ -284,6 +318,8 @@ scripts/codereview/           the logic (importable, raises ReviewError instead 
   scope.py                    file / range / glob scopes, "review as-is" snapshots
   collect.py                  ties the above together into the review input
   githistory.py               blame / log analysis of the code under review
+  context.py                  ingest tickets, specs, docs, images, links
+  scan.py                     secret detection and scanner integrations
   review.py                   review.json validation, cited-commit checks
   summary.py                  the summary posted in the chat
   report.py                   HTML report generation

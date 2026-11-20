@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-11-20
+
+### Added
+- **Review against requirements**: `--req <file|url|text>` (repeatable) and free text after ` -- `.
+  Takes tickets, specs (md, txt, pdf, docx), mockup images and links, plus anything pasted in the
+  chat. A new `context.py` collects the sources. The review turns them into a requirements
+  checklist (met / partial / missing / contradicted / unclear) with evidence lines and linked
+  comments, and checks that mandated tools, APIs and data formats are used correctly.
+- **Reuse / DRY**: the reviewer searches the codebase for existing code the change duplicates.
+  Comments can carry a `reuse` pointer to the code to reuse or extend.
+- **Automated checks**: a new `scan.py` runs a built-in secret detector plus semgrep, bandit,
+  npm audit and pip-audit when installed, only on the reviewed files. Findings on changed lines
+  are separated from pre-existing ones, and secret values are redacted.
+- **Performance and memory**: a per-stack memory-leak checklist, static performance analysis,
+  and optional throwaway benchmarks (`--bench` / `--no-bench`) written to the output folder.
+- **Impact and caveats**: breaking changes, caveats, considerations, affected areas and rollout.
+- Report: Requirements, Impact & caveats, and Analysis & automated checks sections; requirement
+  chips and reuse boxes on comments; click-to-line evidence links. The chat summary includes
+  requirements coverage, breaking changes, caveats and check results.
+- Validation for the new fields, including unknown requirement links, unexplained gaps and reuse
+  targets that don't exist.
+
 ## [1.0.0] - 2026-11-19
 
 First public release.
@@ -28,3 +50,4 @@ First public release.
 - Installs as a Claude Code plugin (its own marketplace), or by cloning into a skills folder.
 
 [1.0.0]: https://github.com/rewin0087/claude-code-review/releases/tag/v1.0.0
+[1.1.0]: https://github.com/rewin0087/claude-code-review/compare/v1.0.0...v1.1.0

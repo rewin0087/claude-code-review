@@ -22,6 +22,57 @@ def _cell(x):
     return str(x).replace("|", "\\|").replace("\n", " ")
 
 
+REQ_ORDER = ["met", "partial", "missing", "contradicted", "unclear", "not_applicable"]
+
+
+def _requirements_lines(req):
+    items = req.get("items") or []
+    if not items:
+        return []
+    counts = {}
+    for it in items:
+        counts[it.get("status")] = counts.get(it.get("status"), 0) + 1
+    L = ["", "**Requirements:** %d/%d met%s" % (
+        counts.get("met", 0), len(items),
+        "".join(" · %d %s" % (counts[s], s.replace("_", " ")) for s in REQ_ORDER[1:] if counts.get(s)))]
+    for it in items:
+        if it.get("status") in ("partial", "missing", "contradicted", "unclear"):
+            L.append("- %s **%s**: %s" % (it.get("id", ""), it["status"], first_sentence(it.get("text"), 160)))
+    return L
+
+
+def _impact_lines(impact, limit=6):
+    L = []
+    breaking = impact.get("breaking_changes") or []
+    if breaking:
+        L += ["", "**Breaking changes:**"] + ["- %s" % first_sentence(b, 200) for b in breaking[:limit]]
+    caveats = (impact.get("caveats") or []) + (impact.get("considerations") or [])
+    if caveats:
+        L += ["", "**Caveats and things to consider:**"] + ["- %s" % first_sentence(c, 200) for c in caveats[:limit]]
+        if len(caveats) > limit:
+            L.append("- … %d more in the report" % (len(caveats) - limit))
+    return L
+
+
+def _checks_lines(checks, scan):
+    L = []
+    if scan:
+        on = [f for f in scan.get("findings", []) if f.get("on_change")]
+        ran = [t["tool"] for t in scan.get("tools", []) if t["status"] == "ran"]
+        missing = [t["tool"] for t in scan.get("tools", []) if t["status"] == "missing"]
+        sev = {}
+        for f in on:
+            sev[f["severity"]] = sev.get(f["severity"], 0) + 1
+        L += ["", "**Automated checks** (%s): %s on the change%s" % (
+            ", ".join(ran) or "none ran",
+            ", ".join("%d %s" % (sev[k], k) for k in ("high", "medium", "low", "info") if sev.get(k)) or "no findings",
+            ("; not installed: " + ", ".join(missing)) if missing else "")]
+    for ch in checks:
+        L.append("- %s **%s** — %s: %s" % ({"pass": "✓", "warn": "!", "fail": "✗"}.get(ch.get("status"), "·"),
+                                          ch.get("name", ""), ch.get("status", ""), first_sentence(ch.get("result"), 180)))
+    return L
+
+
 def terminal_summary(diff, review, report_path):
     meta, summary = diff["meta"], review.get("summary") or {}
     comments = sorted(review.get("comments") or [], key=lambda c: (SEVERITIES.index(c["severity"]),
@@ -54,6 +105,9 @@ def terminal_summary(diff, review, report_path):
     hist = summary.get("history") or {}
     if hist.get("context"):
         L.append("**History:** %s" % first_sentence(hist["context"], 300))
+    L += _requirements_lines(summary.get("requirements") or {})
+    L += _impact_lines(summary.get("impact") or {})
+    L += _checks_lines(summary.get("checks") or [], meta.get("scan"))
     findings = [c for c in comments if c["severity"] != "praise"]
     if findings:
         L += ["", "### Findings", "", "| # | Severity | Location | Issue | Suggested fix |", "|---|---|---|---|---|"]
