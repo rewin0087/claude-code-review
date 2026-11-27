@@ -19,13 +19,15 @@ It runs on your existing Claude Code session, in the terminal, VS Code or JetBra
 - **Review against requirements**: pass a ticket, spec, PDF, Word doc, mockup image, link or plain text with `--req` (or after ` -- `). It turns them into a numbered checklist and marks each item met, partial, missing or contradicted, with evidence lines. It also checks that the mandated tools, APIs and data formats are used, and used correctly.
 - **Reuse and DRY**: searches the codebase for existing helpers, services and components that the change duplicates, and points to the code to reuse or extend.
 - **Automated checks**: a built-in secret detector, plus semgrep, bandit, npm audit and pip-audit when installed. Findings on the changed lines are separated from pre-existing ones, and secrets are redacted.
+- **N+1 queries, SQL injection, performance and benchmarks**: dedicated focus areas, always assessed, each with a status and a recommended fix. A built-in `sql-checks` scanner flags SQL built from strings and database calls inside loops.
+- **You decide on every fix**: each finding has one recommended fix, marked required or optional, with its effort and why it's the best option. Click **Agree / Won't fix / Comment** in the report (or reply in the chat) and paste **Copy decisions** back. Claude only changes the code you agreed to.
 - **Performance and memory**: static analysis of hot paths and a per-stack memory-leak checklist. When it matters, or with `--bench`, a throwaway benchmark runs in the output folder, never in your repo.
 - **Impact and caveats**: breaking changes, caveats, things to consider, affected areas and a rollout plan.
 - **Approach validation**: infers what the change is trying to do and rates the approach (sound / acceptable / questionable / flawed). It proposes alternative approaches with pros and cons and marks one as recommended.
 - **Reasoned comments**: each comment has a severity, category, confidence, a concrete failure scenario, its reasoning, a suggested fix with code, and alternatives.
 - **Web references**: every critical or major finding cites official docs, OWASP/CWE, RFCs or well-known open-source code. It may only cite links it actually opened, and its searches never include your code.
 - **Git history ("why is it like this?")**: blames the lines your branch removes or rewrites and finds the commits that introduced them. It flags past fixes, reverts and workarounds, and warns when a change could bring an old bug back. Every cited commit SHA is checked against the repo.
-- **Interactive report**: unified or side-by-side diff with inline comments, a file/comment sidebar, severity filters, search, resolve/viewed tracking, an "Open in VS Code" link, commit links to GitHub/GitLab, keyboard navigation, dark mode, and "Copy as Markdown" for PR descriptions.
+- **Interactive report**: unified or side-by-side diff with **word-level highlighting** (the exact words added, removed or replaced inside a changed line stand out from the line colour), inline comments, a file/comment sidebar, severity filters, search, resolve/viewed tracking, an "Open in VS Code" link, commit links to GitHub/GitLab, keyboard navigation, dark mode, and "Copy as Markdown" for PR descriptions.
 - **Results in the chat**: the verdict, the approach rating and a table of every finding, with a link to the report.
 - **Large diffs**: split across parallel sub-agents.
 
@@ -48,7 +50,7 @@ so since 2.0.0 it's **`/branch-review`**. They work well side by side:
 | Git history | — | blame-based agent | blame, `log -L` / `-S`, past fixes and reverts, cited SHAs verified |
 | Scanners | — | — | secret detector, plus semgrep, bandit, npm audit and pip-audit when installed |
 | Output | findings in the chat | terminal, or a PR comment | chat summary **plus an interactive HTML report** (diff, inline comments, filters, resolve tracking, Copy MD) |
-| Acts on findings | `--fix` applies them, `--comment` posts inline PR comments | `--comment` posts a PR comment | none: you fix, then copy the Markdown into your PR |
+| Acts on findings | `--fix` applies them, `--comment` posts inline PR comments | `--comment` posts a PR comment | recommends a fix per finding; you agree / decline / comment, then it applies only the agreed ones |
 | Cloud | `ultra`: a multi-agent review in the cloud (billed) | — | — (runs in your session) |
 
 A good combination: run **`/branch-review`** while you build, against the ticket, with the HTML report

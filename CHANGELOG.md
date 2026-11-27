@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-11-27
+
+### Added
+- **Focus areas: N+1 queries, SQL injection, performance and benchmarks.** Always assessed, each
+  with a status, findings and a recommended fix, in a new report card and a new table in the chat
+  summary (`summary.focus_areas` in review.json).
+- Built-in `sql-checks` scanner: flags SQL built with interpolation/concatenation, `ORDER BY` from
+  request input, and database calls inside loops (N+1 suspects). The reviewer confirms or dismisses each.
+- **Recommended fixes you decide on.** Every finding carries one recommended fix marked *required* or
+  *optional*, with effort and why it's the best fix. The report has **Agree / Won't fix / Comment**
+  on each fix (saved in the browser) and a **Copy decisions** button that you paste back into Claude
+  Code. The chat summary asks for your call (`agree c1 c3`, `skip c2`, `c4: …`). Claude implements
+  only the fixes you agreed to (new Step 8).
+- Per-finding `benchmark` numbers (before/after).
+- **Word-level diff.** Inside a changed line, the exact words added, removed or replaced get a
+  second, stronger highlight on top of the line colour (replaced words are underlined, and hovering
+  shows the old/new text). Toggle with the **Word diff** button or `w`. Works in unified and split views.
+- Keyboard: `a` / `d` agree / won't fix the focused finding.
+
+### Changed
+- The findings table in the chat now shows the comment ID, focus area, and whether the fix is
+  required or optional.
+
 ## [2.0.0] - 2026-11-20
 
 ### Changed (breaking)

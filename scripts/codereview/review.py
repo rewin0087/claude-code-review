@@ -9,6 +9,13 @@ SEVERITIES = ["critical", "major", "minor", "suggestion", "nitpick", "praise"]
 VERDICTS = ["approve", "approve_with_suggestions", "request_changes"]
 REQUIREMENT_STATUSES = ["met", "partial", "missing", "contradicted", "unclear", "not_applicable"]
 CHECK_STATUSES = ["pass", "warn", "fail", "info"]
+# Dedicated focus areas: always assessed, each with its own status and recommended fix.
+FOCUS_AREAS = ["n_plus_one", "sql_injection", "performance", "benchmark"]
+FOCUS_LABELS = {"n_plus_one": "N+1 queries", "sql_injection": "SQL injection",
+                "performance": "Performance", "benchmark": "Benchmarks"}
+FOCUS_STATUSES = CHECK_STATUSES + ["not_applicable"]
+CATEGORY_AREA = {"n-plus-one": "n_plus_one", "sql-injection": "sql_injection", "performance": "performance"}
+EFFORTS = ["low", "medium", "high"]
 
 
 def load_json(path, what):
@@ -73,7 +80,8 @@ def validate(diff, review):
             c["_unanchored"] = True
     warnings += missing_references(review)
     e2, w2 = validate_context_sections(diff, review)
-    return errors + e2, warnings + w2
+    e3, w3 = validate_fixes_and_focus(review)
+    return errors + e2 + e3, warnings + w2 + w3
 
 
 def _anchor_warning(files, path, line, where):
@@ -136,6 +144,84 @@ def validate_context_sections(diff, review):
                 reuse["_missing"] = True
                 warnings.append("comments[%d].reuse points at %s, which does not exist in the repo"
                                 % (i, reuse["file"]))
+    return errors, warnings
+
+
+def comment_area(c):
+    """The focus area a comment belongs to, from `focus` or its category (None if none)."""
+    if c.get("focus") in FOCUS_AREAS:
+        return c["focus"]
+    return CATEGORY_AREA.get(c.get("category")) or ("benchmark" if c.get("benchmark") else None)
+
+
+def validate_fixes_and_focus(review):
+    """Recommended fixes on comments, and the four focus areas (N+1, SQLi, perf, benchmark).
+
+    Normalises in place: suggestion.optional defaults to False for critical/major findings and
+    True otherwise; focus-area comments are linked to their area automatically.
+    """
+    errors, warnings = [], []
+    summary = review.get("summary") if isinstance(review.get("summary"), dict) else {}
+    comments = review.get("comments") if isinstance(review.get("comments"), list) else []
+    ids = {c.get("id") for c in comments}
+
+    for i, c in enumerate(comments):
+        if c.get("severity") == "praise":
+            continue
+        where = "comments[%d]" % i
+        if c.get("focus") is not None and c["focus"] not in FOCUS_AREAS:
+            errors.append("%s.focus must be one of %s" % (where, FOCUS_AREAS))
+        sg = c.get("suggestion")
+        if not isinstance(sg, dict) or not (sg.get("description") or sg.get("code")):
+            warnings.append("%s (%s: %s) has no recommended fix; add suggestion.description (and code)"
+                            % (where, c.get("severity"), c.get("title", "")))
+            continue
+        sg.setdefault("optional", c.get("severity") not in ("critical", "major"))
+        if sg.get("effort") is not None and sg["effort"] not in EFFORTS:
+            errors.append("%s.suggestion.effort must be one of %s" % (where, EFFORTS))
+        if comment_area(c) and not sg.get("why_best"):
+            warnings.append("%s (%s) is a focus-area finding; add suggestion.why_best explaining why "
+                            "this is the best fix" % (where, comment_area(c)))
+
+    areas = summary.get("focus_areas")
+    if areas is None:
+        warnings.append("summary.focus_areas is missing; assess %s (use status not_applicable with a "
+                        "one-line reason where there is nothing to check)" % ", ".join(FOCUS_AREAS))
+        return errors, warnings
+    if not isinstance(areas, list):
+        errors.append("summary.focus_areas must be an array")
+        return errors, warnings
+    by_area = {}
+    for i, fa in enumerate(areas):
+        where = "summary.focus_areas[%d]" % i
+        if fa.get("area") not in FOCUS_AREAS:
+            errors.append("%s.area must be one of %s" % (where, FOCUS_AREAS))
+            continue
+        if fa.get("status") not in FOCUS_STATUSES:
+            errors.append("%s.status must be one of %s" % (where, FOCUS_STATUSES))
+        by_area[fa["area"]] = fa
+        linked = fa.get("comments") or []
+        for x in linked:
+            if x not in ids:
+                warnings.append("%s links comment '%s', which does not exist" % (where, x))
+        fa["comments"] = [x for x in linked if x in ids]
+        rec = fa.get("recommendation")
+        if rec is not None and not isinstance(rec, dict):
+            errors.append("%s.recommendation must be an object" % where)
+        elif rec and rec.get("effort") is not None and rec["effort"] not in EFFORTS:
+            errors.append("%s.recommendation.effort must be one of %s" % (where, EFFORTS))
+    for a in FOCUS_AREAS:
+        if a not in by_area:
+            warnings.append("summary.focus_areas has no entry for '%s'; add one (status not_applicable "
+                            "with a reason if it doesn't apply)" % a)
+    for c in comments:
+        a = comment_area(c)
+        if a in by_area and c.get("id") not in by_area[a]["comments"]:
+            by_area[a]["comments"].append(c["id"])
+    for a, fa in by_area.items():
+        if fa.get("status") in ("warn", "fail") and not fa["comments"] and not fa.get("recommendation"):
+            warnings.append("summary.focus_areas '%s' is %s but has no linked comment or recommendation"
+                            % (a, fa.get("status")))
     return errors, warnings
 
 

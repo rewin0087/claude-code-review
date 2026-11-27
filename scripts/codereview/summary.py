@@ -3,7 +3,7 @@ import os
 import re
 import urllib.parse
 
-from .review import SEVERITIES
+from .review import FOCUS_AREAS, FOCUS_LABELS, SEVERITIES, comment_area
 
 
 def first_sentence(text, limit=220):
@@ -73,6 +73,48 @@ def _checks_lines(checks, scan):
     return L
 
 
+STATUS_ICON = {"pass": "✓", "warn": "!", "fail": "✗", "info": "·", "not_applicable": "–"}
+
+
+def _focus_lines(summary, comments, scan):
+    """N+1 / SQL injection / performance / benchmark: status, findings and the recommended fix."""
+    areas = {fa.get("area"): fa for fa in summary.get("focus_areas") or [] if isinstance(fa, dict)}
+    if not areas:
+        return []
+    by_id = {c.get("id"): c for c in comments}
+    suspects = {}
+    for f in (scan or {}).get("findings", []):
+        if f.get("on_change") and f.get("area"):
+            suspects[f["area"]] = suspects.get(f["area"], 0) + 1
+    L = ["", "### Focus areas", "", "| Area | Status | Findings | Recommended fix |", "|---|---|---|---|"]
+    for a in FOCUS_AREAS:
+        fa = areas.get(a)
+        if not fa:
+            continue
+        ids = [x for x in fa.get("comments") or [] if x in by_id]
+        found = ", ".join("`%s`" % x for x in ids) or "none"
+        if suspects.get(a):
+            found += " (%d scanner suspect%s)" % (suspects[a], "s" if suspects[a] > 1 else "")
+        rec = fa.get("recommendation") or {}
+        fix = rec.get("title") or first_sentence(rec.get("description"), 140)
+        if fix and rec.get("effort"):
+            fix += " _(effort: %s)_" % rec["effort"]
+        status = fa.get("status", "")
+        L.append("| %s | %s %s | %s | %s |" % (FOCUS_LABELS[a], STATUS_ICON.get(status, ""), status.replace("_", " "),
+                                            _cell(found), _cell(fix or first_sentence(fa.get("summary"), 140))))
+    benches = [ch for ch in summary.get("checks") or [] if ch.get("kind") == "benchmark"]
+    for ch in benches:
+        L.append("- Benchmark **%s**: %s" % (ch.get("name", ""), first_sentence(ch.get("result"), 200)))
+    return L
+
+
+def _fix_kind(c):
+    sg = c.get("suggestion") or {}
+    if not (sg.get("description") or sg.get("code")):
+        return ""
+    return "optional" if sg.get("optional", c["severity"] not in ("critical", "major")) else "**required**"
+
+
 def terminal_summary(diff, review, report_path):
     meta, summary = diff["meta"], review.get("summary") or {}
     comments = sorted(review.get("comments") or [], key=lambda c: (SEVERITIES.index(c["severity"]),
@@ -107,19 +149,32 @@ def terminal_summary(diff, review, report_path):
         L.append("**History:** %s" % first_sentence(hist["context"], 300))
     L += _requirements_lines(summary.get("requirements") or {})
     L += _impact_lines(summary.get("impact") or {})
-    L += _checks_lines(summary.get("checks") or [], meta.get("scan"))
+    L += _checks_lines([ch for ch in summary.get("checks") or [] if ch.get("kind") != "benchmark"]
+                       if summary.get("focus_areas") else summary.get("checks") or [], meta.get("scan"))
+    L += _focus_lines(summary, comments, meta.get("scan"))
     findings = [c for c in comments if c["severity"] != "praise"]
     if findings:
-        L += ["", "### Findings", "", "| # | Severity | Location | Issue | Suggested fix |", "|---|---|---|---|---|"]
-        for i, c in enumerate(findings, 1):
+        L += ["", "### Findings and recommended fixes", "",
+              "| ID | Severity | Area | Location | Issue | Recommended fix | Fix |", "|---|---|---|---|---|---|---|"]
+        for c in findings:
             loc = c["file"] + (":%s" % c["line"] if c.get("line") is not None else "")
             suggestion = c.get("suggestion") or {}
             fix = first_sentence(suggestion.get("description") or "", 140) or \
                 ("see code in report" if suggestion.get("code") else "")
-            L.append("| %d | %s | `%s` | %s | %s |" % (i, c["severity"], _cell(loc), _cell(c.get("title", "")), _cell(fix)))
+            if fix and suggestion.get("effort"):
+                fix += " _(effort: %s)_" % suggestion["effort"]
+            area = comment_area(c)
+            L.append("| `%s` | %s | %s | `%s` | %s | %s | %s |" % (
+                c.get("id", ""), c["severity"], FOCUS_LABELS.get(area, c.get("category") or ""), _cell(loc),
+                _cell(c.get("title", "")), _cell(fix), _fix_kind(c)))
     praise = [c for c in comments if c["severity"] == "praise"]
     if praise:
         L += ["", "**Done well:** " + "; ".join(c.get("title", "") for c in praise)]
+    if any(_fix_kind(c) for c in findings):
+        L += ["", "**Your call on the recommended fixes:** reply with e.g. `agree c1 c3`, `skip c2`, "
+                  "`agree all required`, or `c4: <your comment>`. You can also click **Agree / Won't fix / "
+                  "Comment** on each finding in the report and paste **Copy decisions** here. "
+                  "Nothing in your code changes until you agree."]
     L.append("")
     L.append("**Full interactive review** (diff with inline comments, reasoning, alternatives, references): [%s](%s)"
              % (os.path.basename(report_path), file_url(report_path)))

@@ -59,6 +59,23 @@ Write exactly one JSON object to `<OUT_DIR>/review.json`. All string fields that
         "details": "markdown — command, code, raw numbers (optional)"
       }
     ],
+    "focus_areas": [                               // always include all four (Step 3a)
+      {
+        "area": "n_plus_one | sql_injection | performance | benchmark",
+        "status": "pass | warn | fail | info | not_applicable",
+        "summary": "markdown — what you checked and found (or why it doesn't apply)",
+        "comments": ["c1"],                        // optional; comments in this area are linked automatically
+        "recommendation": {                        // the best area-wide fix; required when warn/fail and no comment
+          "title": "Eager-load authors with includes(:author)",
+          "description": "markdown",
+          "code": "optional", "language": "optional",
+          "why_best": "markdown — why this beats the alternatives here",
+          "effort": "low | medium | high",
+          "optional": false,                       // false = must fix; true = user's call (default: false only when status is fail)
+          "references": [ { "title": "...", "url": "https://..." } ]
+        }
+      }
+    ],
     "history": {                                   // optional; include when Step 2b ran
       "context": "markdown — why the existing code was written that way, and whether this branch's reason for changing it holds up",
       "timeline": [
@@ -75,15 +92,24 @@ Write exactly one JSON object to `<OUT_DIR>/review.json`. All string fields that
       "end_line": 47,                              // optional, for multi-line ranges (same side)
       "side": "new",                               // "new" (added/context lines) or "old" (deleted lines)
       "severity": "critical | major | minor | suggestion | nitpick | praise",
-      "category": "bug | regression | security | requirements | duplication | memory | dependency | performance | design | correctness | concurrency | error-handling | testing | readability | maintainability | best-practice | accessibility | api-design | data",
+      "category": "bug | regression | security | sql-injection | n-plus-one | requirements | duplication | memory | dependency | performance | design | correctness | concurrency | error-handling | testing | readability | maintainability | best-practice | accessibility | api-design | data",
       "confidence": "high | medium | low",
       "title": "Short imperative headline",
       "body": "markdown — what is wrong and the concrete impact (inputs/state -> wrong outcome)",
       "reasoning": "markdown — step-by-step why you believe this; what you checked in the surrounding code",
-      "suggestion": {
+      "focus": "n_plus_one | sql_injection | performance | benchmark",   // optional; derived from category if omitted
+      "suggestion": {                              // the RECOMMENDED fix; required on every non-praise comment
         "description": "markdown — the better approach",
         "code": "replacement code for the commented line(s), no diff markers",
-        "language": "ruby"
+        "language": "ruby",
+        "why_best": "markdown — why this is the best fix (required for focus-area findings)",
+        "effort": "low | medium | high",
+        "optional": false                          // default: false for critical/major, true otherwise
+      },
+      "benchmark": {                               // optional: measured numbers for this finding
+        "before": "412 ms", "after": "6 ms",
+        "result": "markdown — input size, runs, conclusion",
+        "command": "python3 .branch-review/x/bench/users_bench.py"
       },
       "alternatives": [
         { "title": "...", "description": "markdown", "code": "optional", "language": "optional" }
@@ -134,6 +160,17 @@ Write exactly one JSON object to `<OUT_DIR>/review.json`. All string fields that
   the review. `reuse.file` may be anywhere in the repo, and must exist.
 - Scanner output is shown by the report automatically from `scan.json`. Don't copy it into
   `checks`; turn real findings into comments instead.
+
+## Focus area and recommended-fix rules
+
+- `summary.focus_areas` has one entry for each of `n_plus_one`, `sql_injection`, `performance`,
+  `benchmark`. `render.py` warns about a missing area, and about a warn/fail area with neither a
+  linked comment nor a `recommendation`.
+- Comments with category `n-plus-one`, `sql-injection` or `performance` (or a `benchmark`) are shown
+  in that area automatically.
+- Every non-praise comment needs a `suggestion` (the recommended fix). Focus-area findings also need
+  `suggestion.why_best`. The report lets the user Agree / Won't fix / Comment on each one, and the
+  chat summary asks for their decision. Only implement fixes after they agree (SKILL.md Step 8).
 
 ## History rules
 
