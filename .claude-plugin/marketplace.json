@@ -10,7 +10,7 @@
       "name": "branch-review",
       "source": "./",
       "description": "AI code review of your branch's changes with an interactive HTML report.",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "category": "development",
       "keywords": [
         "code-review",

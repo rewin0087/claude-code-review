@@ -14,6 +14,7 @@
   --add-bg: #e9f8ee; --add-num: #d3f0dc; --add-word: #1a7f37;
   --del-bg: #fdecec; --del-num: #f8d7d7; --del-word: #c62828;
   --hunk-bg: #eef2fb; --hunk-text: #4a5b80; --hl: #fff6cc;
+  --add-strong: #9be9a8; --del-strong: #ffb3b3; --chg: #bf8700;
   --critical: #d32f2f; --major: #e8590c; --minor: #b7791f; --suggestion: #1971c2; --nitpick: #6b7280; --praise: #2f9e44;
   --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
@@ -26,6 +27,7 @@
     --add-bg: #12261a; --add-num: #173320; --add-word: #56d17a;
     --del-bg: #2c1517; --del-num: #3a1b1e; --del-word: #ff7b7b;
     --hunk-bg: #1a2133; --hunk-text: #9fb0d8; --hl: #3a3417;
+    --add-strong: #1f6b37; --del-strong: #8a2a2e; --chg: #e3b341;
     --shadow: 0 1px 2px rgba(0,0,0,.4);
   }
 }
@@ -35,6 +37,7 @@
   --add-bg: #12261a; --add-num: #173320; --add-word: #56d17a;
   --del-bg: #2c1517; --del-num: #3a1b1e; --del-word: #ff7b7b;
   --hunk-bg: #1a2133; --hunk-text: #9fb0d8; --hl: #3a3417;
+  --add-strong: #1f6b37; --del-strong: #8a2a2e; --chg: #e3b341;
   --shadow: 0 1px 2px rgba(0,0,0,.4);
 }
 * { box-sizing: border-box; }
@@ -225,6 +228,47 @@ tr.flash td { animation: flash 1.6s ease-out; }
 .alt-mini { border-left: 3px solid var(--border); padding: 2px 0 2px 10px; margin: 8px 0; }
 .alt-mini b { display: block; }
 
+/* word-level diff: inside a changed line, the exact part that changed gets a second, stronger highlight */
+.wd { border-radius: 3px; padding: 1px 0; }
+.wd-add { background: var(--add-strong); }
+.wd-del { background: var(--del-strong); text-decoration: line-through; text-decoration-color: var(--del-word); }
+.wd-chg-new { background: var(--add-strong); box-shadow: inset 0 -2px 0 var(--chg); }
+.wd-chg-old { background: var(--del-strong); box-shadow: inset 0 -2px 0 var(--chg); text-decoration: line-through; text-decoration-color: var(--del-word); }
+td.sign.paired { color: var(--chg); font-weight: 700; }
+.wdlegend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+.wdlegend code { font-size: 11.5px; padding: 0 4px; }
+.wdlegend .sw { display: inline-block; width: 22px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; border: 1px solid var(--border); }
+
+/* focus areas */
+.focusgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.ftile { border: 1px solid var(--border); border-top: 3px solid var(--nitpick); border-radius: 8px; padding: 10px 12px; background: var(--panel-2); min-width: 0; }
+.ftile.s-pass { border-top-color: var(--praise); } .ftile.s-warn { border-top-color: var(--minor); } .ftile.s-fail { border-top-color: var(--critical); }
+.ftile.s-info { border-top-color: var(--suggestion); } .ftile.s-not_applicable { opacity: .75; }
+.ftile .fth { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.ftile .fth b { flex: 1; }
+.ftile .muted { color: var(--muted); font-size: 12.5px; }
+.st-not_applicable { background: var(--nitpick); }
+.recbox { border: 1px solid var(--praise); border-radius: 8px; padding: 8px 12px; margin-top: 8px; background: var(--panel); }
+.recbox .why { font-size: 13px; color: var(--muted); }
+.tag.req-fix { color: var(--critical); border-color: var(--critical); font-weight: 650; }
+.tag.opt-fix { color: var(--suggestion); border-color: var(--suggestion); }
+.tag.area { color: var(--accent); border-color: var(--accent); }
+.lbl .tag { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.bench { font-family: var(--mono); font-size: 12.5px; }
+.bench b { color: var(--add-word); }
+
+/* decision bar: agree / won't fix / side comment on each recommended fix */
+.decide { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.decide > .dl { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-right: 4px; }
+.decide .btn { padding: 3px 9px; font-size: 12px; }
+.decide .btn.on.agree { background: var(--praise); border-color: var(--praise); color: #fff; }
+.decide .btn.on.decline { background: var(--nitpick); border-color: var(--nitpick); color: #fff; }
+.decide .btn.on.note { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.decide textarea { flex-basis: 100%; min-height: 56px; resize: vertical; padding: 6px 8px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); font: 13px/1.4 var(--sans); }
+.dico { font-size: 12px; font-weight: 700; }
+.dico.agree { color: var(--praise); } .dico.decline { color: var(--nitpick); } .dico.note { color: var(--accent); }
+
 /* overlays */
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 8px 14px;
   border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 50; }
@@ -264,7 +308,9 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
     <button class="btn" data-view="unified">Unified</button>
     <button class="btn" data-view="split">Split</button>
   </div>
+  <button class="btn hide-sm" id="wordDiff" title="Highlight the exact words changed inside each line (w)">Word diff</button>
   <button class="btn hide-sm" id="expandAll" title="Expand / collapse all files (e)">Collapse all</button>
+  <button class="btn" id="copyDecisions" title="Copy your Agree / Won't fix / Comment decisions to paste back into Claude Code">Copy decisions</button>
   <button class="btn" id="copyMd" title="Copy review as Markdown (for PR description)">Copy MD</button>
   <button class="btn" id="themeBtn" title="Toggle theme (t)">◐</button>
   <button class="btn" id="helpBtn" title="Keyboard shortcuts (?)">?</button>
@@ -303,7 +349,9 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
       <tr><td><kbd>r</kbd></td><td>Resolve / unresolve focused comment</td></tr>
       <tr><td><kbd>x</kbd></td><td>Collapse / expand focused comment</td></tr>
       <tr><td><kbd>o</kbd></td><td>Jump to overview</td></tr>
+      <tr><td><kbd>a</kbd> / <kbd>d</kbd></td><td>Agree / won't fix the focused recommended fix</td></tr>
       <tr><td><kbd>s</kbd></td><td>Toggle unified / split view</td></tr>
+      <tr><td><kbd>w</kbd></td><td>Toggle word-level diff highlighting</td></tr>
       <tr><td><kbd>e</kbd></td><td>Collapse / expand all files</td></tr>
       <tr><td><kbd>/</kbd></td><td>Focus filter</td></tr>
       <tr><td><kbd>t</kbd></td><td>Toggle theme</td></tr>
@@ -326,7 +374,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
   // ---------- storage (best effort) ----------
   var store = {};
   try { store = JSON.parse(localStorage.getItem(STORE_KEY) || "{}") || {}; } catch (e) { store = {}; }
-  store.resolved = store.resolved || {}; store.viewed = store.viewed || {};
+  store.resolved = store.resolved || {}; store.viewed = store.viewed || {}; store.decisions = store.decisions || {};
   function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {} }
   function pref(k, v) {
     try { if (v === undefined) return localStorage.getItem("code-review:pref:" + k); localStorage.setItem("code-review:pref:" + k, v); } catch (e) {}
@@ -349,6 +397,145 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
   function hl(code, lang) {
     if (hasLang(lang)) { try { return hljs.highlight(code, { language: lang, ignoreIllegals: true }).value; } catch (e) {} }
     return esc(code);
+  }
+
+  // ---------- word-level diff ----------
+  // Pairs each removed line with the added line that replaced it, diffs them token by token,
+  // and marks what was added, removed, or replaced inside the line.
+  function tokenize(s) { return s.match(/\w+|\s+|[^\w\s]/g) || []; }
+  function clip(s) { s = s.replace(/\s+/g, " ").trim(); return s.length > 80 ? s.slice(0, 79) + "…" : s; }
+  // Don't paint indentation/trailing spaces inside a mark, unless the change is only whitespace.
+  function trimRange(str, s, e, cls, title) {
+    var s2 = s, e2 = e;
+    while (s2 < e2 && /\s/.test(str.charAt(s2))) s2++;
+    while (e2 > s2 && /\s/.test(str.charAt(e2 - 1))) e2--;
+    return s2 < e2 ? { s: s2, e: e2, cls: cls, title: title } : { s: s, e: e, cls: cls, title: title + " (whitespace)" };
+  }
+  function wordDiff(a, b) {
+    var A = tokenize(a), B = tokenize(b), n = A.length, m = B.length, i, j;
+    if (!n || !m || n * m > 160000) return null;
+    var dp = []; for (i = 0; i <= n; i++) dp.push(new Uint16Array(m + 1));
+    for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--) dp[i][j] = A[i] === B[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    var ops = []; i = 0; j = 0;
+    while (i < n && j < m) {
+      if (A[i] === B[j]) { ops.push(["=", A[i]]); i++; j++; }
+      else if (dp[i + 1][j] >= dp[i][j + 1]) ops.push(["-", A[i++]]);
+      else ops.push(["+", B[j++]]);
+    }
+    while (i < n) ops.push(["-", A[i++]]);
+    while (j < m) ops.push(["+", B[j++]]);
+    var same = 0, oPos = 0, nPos = 0, oR = [], nR = [], k = 0;
+    ops.forEach(function (op) { if (op[0] === "=" && /\S/.test(op[1])) same += op[1].replace(/\s/g, "").length; });
+    var sim = same / Math.max(1, Math.max(a.replace(/\s/g, "").length, b.replace(/\s/g, "").length));
+    while (k < ops.length) {
+      if (ops[k][0] === "=") { oPos += ops[k][1].length; nPos += ops[k][1].length; k++; continue; }
+      var dS = oPos, aS = nPos, del = "", add = "", nDel = 0, nAdd = 0;
+      while (k < ops.length) {
+        var op = ops[k];
+        if (op[0] === "=") {   // a space between two changed words stays inside the same mark
+          if (/^\s+$/.test(op[1]) && k + 1 < ops.length && ops[k + 1][0] !== "=") { oPos += op[1].length; nPos += op[1].length; del += op[1]; add += op[1]; k++; continue; }
+          break;
+        }
+        if (op[0] === "-") { oPos += op[1].length; del += op[1]; nDel++; } else { nPos += op[1].length; add += op[1]; nAdd++; }
+        k++;
+      }
+      if (nDel && nAdd) {
+        oR.push(trimRange(a, dS, oPos, "wd-chg-old", "Replaced by: " + clip(add)));
+        nR.push(trimRange(b, aS, nPos, "wd-chg-new", "Replaced: " + clip(del)));
+      } else if (nDel) oR.push(trimRange(a, dS, oPos, "wd-del", "Removed from this line"));
+      else if (nAdd) nR.push(trimRange(b, aS, nPos, "wd-add", "Added to this line"));
+    }
+    return { old: oR, "new": nR, sim: sim };
+  }
+  function computeWordDiff(f) {
+    if (f._wdDone) return; f._wdDone = true;
+    (f.hunks || []).forEach(function (h) {
+      var L = h.lines, i = 0;
+      while (i < L.length) {
+        if (L[i].t !== "del") { i++; continue; }
+        var dels = [], adds = [];
+        while (i < L.length && (L[i].t === "del" || L[i].t === "meta")) { if (L[i].t === "del") dels.push(L[i]); i++; }
+        while (i < L.length && (L[i].t === "add" || L[i].t === "meta")) { if (L[i].t === "add") adds.push(L[i]); i++; }
+        var next = 0;
+        dels.forEach(function (d) {
+          var best = null, bj = -1;   // most similar added line ahead (keeps pairs in order)
+          for (var j = next; j < adds.length && j < next + 8; j++) {
+            var r = wordDiff(d.c, adds[j].c);
+            if (r && r.sim >= 0.35 && (!best || r.sim > best.sim)) { best = r; bj = j; }
+          }
+          if (best) { d.wd = best.old; adds[bj].wd = best["new"]; d.pair = adds[bj].n; adds[bj].pair = d.o; next = bj + 1; }
+        });
+      }
+    });
+  }
+  // Wrap text ranges of highlighted HTML in <span class="wd ...">, closing and reopening around tags.
+  function markRanges(html, ranges) {
+    if (!ranges || !ranges.length) return html;
+    var out = "", pos = 0, ri = 0, open = null, i = 0, n = html.length;
+    function openTag(r) { return '<span class="wd ' + r.cls + '" title="' + esc(r.title || "") + '">'; }
+    while (i < n) {
+      var ch = html.charAt(i);
+      if (ch === "<") { var j = html.indexOf(">", i); if (j < 0) j = n - 1; var tag = html.slice(i, j + 1); out += open ? "</span>" + tag + openTag(open) : tag; i = j + 1; continue; }
+      if (open && pos >= open.e) { out += "</span>"; open = null; }
+      while (ri < ranges.length && ranges[ri].e <= pos) ri++;
+      if (!open && ri < ranges.length && pos >= ranges[ri].s) { open = ranges[ri]; out += openTag(open); }
+      var len = 1;
+      if (ch === "&") { var sc = html.indexOf(";", i); if (sc > i && sc - i < 10) len = sc - i + 1; }
+      out += html.substr(i, len); i += len; pos++;
+    }
+    if (open) out += "</span>";
+    return out;
+  }
+  function codeHtml(l, lang) {
+    var h = hl(l.c, lang);
+    if (state.wordDiff && l.wd && l.wd.length) h = markRanges(h, l.wd);
+    return h || " ";
+  }
+  function signHtml(l, cls) {
+    var s = cls === "add" ? "+" : cls === "del" ? "−" : "";
+    if (state.wordDiff && l.pair != null) return '<td class="sign paired" title="Changed line: ' + (cls === "add" ? "replaces old line " : "replaced by new line ") + l.pair + '">' + s + "</td>";
+    return '<td class="sign">' + s + "</td>";
+  }
+
+  // ---------- focus areas & decisions ----------
+  var FOCUS = ["n_plus_one", "sql_injection", "performance", "benchmark"];
+  var FOCUS_LABEL = { n_plus_one: "N+1 queries", sql_injection: "SQL injection", performance: "Performance", benchmark: "Benchmarks" };
+  var CAT_AREA = { "n-plus-one": "n_plus_one", "sql-injection": "sql_injection", performance: "performance" };
+  function commentArea(c) { return FOCUS.indexOf(c.focus) >= 0 ? c.focus : CAT_AREA[c.category] || (c.benchmark ? "benchmark" : null); }
+  function hasFix(c) { var s = c.suggestion; return c.severity !== "praise" && !!(s && (s.description || s.code)); }
+  function fixRequired(c) { var s = c.suggestion || {}; return s.optional === undefined ? (c.severity === "critical" || c.severity === "major") : !s.optional; }
+  function fixTags(sg, required) {
+    return '<span class="tag ' + (required ? "req-fix" : "opt-fix") + '" title="' + (required ? "Should be fixed before merging" : "Optional: your call") + '">' + (required ? "required" : "optional") + "</span>" +
+      (sg && sg.effort ? '<span class="tag" title="Estimated effort">effort: ' + esc(sg.effort) + "</span>" : "");
+  }
+  function decision(key) { return store.decisions[key] || {}; }
+  function decisionIcon(key) {
+    var d = decision(key);
+    return (d.d === "agree" ? '<span class="dico agree" title="You agreed to implement">✓</span>' : d.d === "decline" ? '<span class="dico decline" title="Won\'t fix">✗</span>' : "") +
+      (d.note ? '<span class="dico note" title="' + esc(d.note) + '">💬</span>' : "");
+  }
+  function decisionHtml(key) {
+    var d = decision(key);
+    return '<div class="decide" data-dkey="' + esc(key) + '"><span class="dl">Your decision</span>' +
+      '<button class="btn agree' + (d.d === "agree" ? " on" : "") + '" data-decide="agree" title="Agree: implement the recommended fix (a)">✓ Agree, implement</button>' +
+      '<button class="btn decline' + (d.d === "decline" ? " on" : "") + '" data-decide="decline" title="Don\'t implement this fix (d)">✗ Won\'t fix</button>' +
+      '<button class="btn note' + (d.note ? " on" : "") + '" data-decide="note" title="Add a side comment">💬 Comment</button>' +
+      '<textarea class="dnote' + (d.note ? "" : " hidden") + '" placeholder="Side comment, e.g. &quot;agree, but use the existing scope instead&quot; or why you won\'t fix it">' + esc(d.note || "") + "</textarea></div>";
+  }
+  function refreshDecision(key) {
+    var d = decision(key);
+    $$('.decide[data-dkey="' + key.replace(/"/g, '\\"') + '"]').forEach(function (box) {
+      box.querySelector(".agree").classList.toggle("on", d.d === "agree");
+      box.querySelector(".decline").classList.toggle("on", d.d === "decline");
+      box.querySelector(".note").classList.toggle("on", !!d.note);
+    });
+  }
+  function setDecision(key, val) {
+    var d = store.decisions[key] = store.decisions[key] || {};
+    d.d = d.d === val ? null : val;
+    if (!d.d && !d.note) delete store.decisions[key];
+    save(); refreshDecision(key); renderSide();
+    toast(!d.d ? "Decision cleared" : d.d === "agree" ? "Agreed: will implement" : "Marked as won't fix");
   }
 
   // ---------- tiny markdown ----------
@@ -433,6 +620,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
   // ---------- state ----------
   var state = {
     view: pref("view") || "unified",
+    wordDiff: pref("worddiff") !== "off",
     sevOff: {},
     q: "",
     hideResolved: false,
@@ -459,7 +647,9 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
     var h = '<div class="chead">' +
       '<span class="badge sev-' + esc(c.severity) + '">' + esc(SEV_LABEL[c.severity] || c.severity) + "</span>" +
       '<span class="ctitle">' + inline(c.title || "") + "</span>" +
+      (commentArea(c) ? '<span class="tag area" title="Focus area">' + esc(FOCUS_LABEL[commentArea(c)]) + "</span>" : "") +
       (c.category ? '<span class="tag">' + esc(c.category) + "</span>" : "") +
+      (hasFix(c) ? fixTags(c.suggestion, fixRequired(c)) + decisionIcon(c.id) : "") +
       (c.confidence ? '<span class="tag" title="Reviewer confidence">' + esc(c.confidence) + " confidence</span>" : "") +
       (c.requirements || []).map(function (r) { return '<span class="tag req" data-req="' + esc(r) + '" title="Linked requirement">' + esc(r) + "</span>"; }).join("") +
       "</div><div class='cbody'>";
@@ -475,8 +665,13 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
         (fileByPath[ru.file] ? ' · <a href="#" data-gotoline="' + esc(ru.file) + "|" + esc(ru.line || "") + '">show in diff</a>' : "") + "</div>" +
         md(ru.description, (fileByPath[ru.file] || {}).language) + "</div>";
     }
+    if (c.benchmark) h += '<div class="sec"><div class="lbl">Benchmark</div>' + benchHtml(c.benchmark) + "</div>";
     if (c.suggestion && (c.suggestion.description || c.suggestion.code)) {
-      h += '<div class="sec"><div class="lbl">Suggested fix</div>' + md(c.suggestion.description, lang) + (c.suggestion.code ? codeBlock(c.suggestion.code, lang) : "") + "</div>";
+      var sg = c.suggestion;
+      h += '<div class="sec recbox"><div class="lbl">Recommended fix ' + (c.severity !== "praise" ? fixTags(sg, fixRequired(c)) : "") + "</div>" +
+        md(sg.description, lang) + (sg.code ? codeBlock(sg.code, sg.language || lang) : "") +
+        (sg.why_best ? '<div class="why"><b>Why this is the best fix:</b>' + md(sg.why_best, lang) + "</div>" : "") +
+        (c.severity !== "praise" ? decisionHtml(c.id) : "") + "</div>";
     }
     if (c.alternatives && c.alternatives.length) {
       h += '<details class="sec"' + (c.severity === "critical" || c.severity === "major" ? " open" : "") + "><summary>Alternative approaches (" + c.alternatives.length + ")</summary>" +
@@ -500,7 +695,14 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
     if (c.reuse && c.reuse.file) s += "\n**Reuse:** `" + c.reuse.file + (c.reuse.line ? ":" + c.reuse.line : "") + "`" + (c.reuse.symbol ? " (" + c.reuse.symbol + ")" : "") + " — " + (c.reuse.description || "") + "\n";
     if (c.requirements && c.requirements.length) s += "\n**Requirements:** " + c.requirements.join(", ") + "\n";
     if (c.history && c.history.length) s += "\n**History:**\n" + c.history.map(function (x) { return "- `" + (x.short || x.sha) + "` " + (x.subject || "") + (x.note ? " — " + x.note : ""); }).join("\n") + "\n";
-    if (c.suggestion) { s += "\n**Suggested fix:** " + (c.suggestion.description || "") + "\n"; if (c.suggestion.code) s += "\n```" + (c.suggestion.language || "") + "\n" + c.suggestion.code + "\n```\n"; }
+    if (c.benchmark) s += "\n**Benchmark:** " + benchText(c.benchmark) + "\n";
+    if (c.suggestion) {
+      s += "\n**Recommended fix" + (hasFix(c) ? " (" + (fixRequired(c) ? "required" : "optional") + (c.suggestion.effort ? ", effort " + c.suggestion.effort : "") + ")" : "") + ":** " + (c.suggestion.description || "") + "\n";
+      if (c.suggestion.code) s += "\n```" + (c.suggestion.language || "") + "\n" + c.suggestion.code + "\n```\n";
+      if (c.suggestion.why_best) s += "\n**Why this is the best fix:** " + c.suggestion.why_best + "\n";
+      var dd = decision(c.id);
+      if (dd.d || dd.note) s += "\n**Decision:** " + (dd.d === "agree" ? "agree, implement" : dd.d === "decline" ? "won't fix" : "undecided") + (dd.note ? " (" + dd.note + ")" : "") + "\n";
+    }
     (c.alternatives || []).forEach(function (a) { s += "\n**Alternative — " + a.title + ":** " + (a.description || "") + "\n"; });
     if (c.references && c.references.length) s += "\n" + c.references.map(function (r) { return "- [" + (r.title || r.url) + "](" + r.url + ")" + (r.note ? " — " + r.note : ""); }).join("\n") + "\n";
     return s;
@@ -586,6 +788,71 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
     return h + "</div></div>";
   }
 
+  function benchHtml(b) {
+    if (typeof b === "string") return md(b);
+    return '<div class="bench">' + (b.before ? "before: " + esc(b.before) : "") + (b.before && b.after ? " → " : "") + (b.after ? "after: <b>" + esc(b.after) + "</b>" : "") + "</div>" +
+      md(b.result) + (b.command ? "<details class='sec'><summary>Command</summary>" + codeBlock(b.command, "bash") + "</details>" : "");
+  }
+  function benchText(b) {
+    if (typeof b === "string") return b;
+    return [b.before ? "before " + b.before : "", b.after ? "after " + b.after : "", b.result || ""].filter(Boolean).join("; ");
+  }
+  function focusCard() {
+    var areas = {}; (SUMMARY.focus_areas || []).forEach(function (fa) { if (fa && FOCUS.indexOf(fa.area) >= 0) areas[fa.area] = fa; });
+    if (!Object.keys(areas).length) return "";
+    var suspects = {}; ((META.scan && META.scan.findings) || []).forEach(function (f) { if (f.area && f.on_change) suspects[f.area] = (suspects[f.area] || 0) + 1; });
+    var bad = FOCUS.filter(function (a) { return areas[a] && (areas[a].status === "fail" || areas[a].status === "warn"); }).length;
+    var h = '<div class="card" id="fcCard"><header><h2>Focus areas: N+1 · SQL injection · Performance · Benchmarks</h2>' +
+      (bad ? '<span class="st st-warn">' + bad + " need attention</span>" : '<span class="st st-pass">all clear</span>') + '</header><div class="body"><div class="focusgrid">';
+    FOCUS.forEach(function (a) {
+      var fa = areas[a]; if (!fa) return;
+      var cs = (fa.comments || []).map(function (id) { return COMMENTS.filter(function (c) { return c.id === id; })[0]; }).filter(Boolean);
+      COMMENTS.forEach(function (c) { if (commentArea(c) === a && cs.indexOf(c) < 0) cs.push(c); });
+      var st = fa.status || "info", rec = fa.recommendation;
+      h += '<div class="ftile s-' + esc(st) + '" id="focus-' + a + '"><div class="fth"><b>' + FOCUS_LABEL[a] + '</b><span class="st st-' + esc(st) + '">' + esc(st.replace("_", " ")) + "</span></div>" + md(fa.summary);
+      if (cs.length) h += '<div class="muted" style="margin-top:6px">Findings: ' + cs.map(function (c) { return '<span class="chiplink" data-goto="' + esc(c.id) + '" title="' + esc(c.title || "") + '">' + esc(c.id) + " · " + esc(c.severity) + "</span>" + decisionIcon(c.id); }).join(" ") + "</div>";
+      if (suspects[a]) h += '<div class="muted">' + suspects[a] + " scanner suspect(s) on the changed lines (see Analysis &amp; automated checks).</div>";
+      if (a === "benchmark") {
+        var benches = (SUMMARY.checks || []).filter(function (ch) { return ch.kind === "benchmark"; });
+        benches.forEach(function (ch) { h += '<div style="margin-top:6px"><span class="st st-' + esc(ch.status) + '">' + esc(ch.status || "") + "</span> <b>" + inline(ch.name || "") + "</b>" + md(ch.result) + (ch.details ? "<details class='sec'><summary>Details</summary>" + md(ch.details) + "</details>" : "") + "</div>"; });
+      }
+      if (rec && (rec.title || rec.description || rec.code)) {
+        var req = rec.optional === undefined ? st === "fail" : !rec.optional;
+        h += '<div class="recbox"><div class="sec" style="margin-top:0"><div class="lbl">Recommended fix ' + fixTags(rec, req) + "</div></div>" +
+          (rec.title ? "<b>" + inline(rec.title) + "</b>" : "") + md(rec.description) + (rec.code ? codeBlock(rec.code, rec.language) : "") +
+          (rec.why_best ? '<div class="why"><b>Why this is the best fix:</b>' + md(rec.why_best) + "</div>" : "") +
+          (rec.references && rec.references.length ? refsHtml(rec.references) : "") + decisionHtml("area:" + a) + "</div>";
+      }
+      h += "</div>";
+    });
+    return h + "</div></div></div>";
+  }
+  function decisionItems() {
+    var items = [];
+    var areas = SUMMARY.focus_areas || [];
+    areas.forEach(function (fa) {
+      var rec = fa.recommendation; if (!rec || !(rec.title || rec.description || rec.code)) return;
+      items.push({ key: "area:" + fa.area, id: "area:" + fa.area, label: FOCUS_LABEL[fa.area] + " (area-wide)", title: rec.title || first(rec.description), where: "", required: rec.optional === undefined ? fa.status === "fail" : !rec.optional, fix: rec.description || "" });
+    });
+    COMMENTS.filter(hasFix).sort(function (a, b) { return sevRank(a.severity) - sevRank(b.severity); }).forEach(function (c) {
+      items.push({ key: c.id, id: c.id, label: c.severity + (commentArea(c) ? ", " + FOCUS_LABEL[commentArea(c)] : ""), title: c.title, where: c.file + (c.line != null ? ":" + c.line : ""), required: fixRequired(c), fix: c.suggestion.description || "" });
+    });
+    return items;
+  }
+  function first(t) { t = String(t || "").replace(/```[\s\S]*?```/g, "").replace(/\s+/g, " ").trim(); var m = t.match(/^(.+?[.!?])(\s|$)/); t = m ? m[1] : t; return t.length > 160 ? t.slice(0, 159) + "…" : t; }
+  function decisionsMd() {
+    var items = decisionItems(), groups = { agree: [], decline: [], note: [], none: [] };
+    items.forEach(function (it) { var d = decision(it.key); (d.d ? groups[d.d] : d.note ? groups.note : groups.none).push(it); });
+    function line(it) { var d = decision(it.key); return "- `" + it.id + "` [" + it.label + (it.required ? ", required" : ", optional") + "] " + it.title + (it.where ? " (`" + it.where + "`)" : "") + (it.fix ? "\n  Recommended fix: " + first(it.fix) : "") + (d.note ? "\n  My comment: " + d.note.replace(/\n+/g, " ") : ""); }
+    var s = "/branch-review decisions for `" + META.branch + "`" + (META.base ? " → `" + META.base + "`" : "") + "\nReport: " + location.href + "\n\n";
+    s += "Please implement the fixes I agreed to (follow my comments where given), skip the ones I declined, and answer my comments.\n\n";
+    if (groups.agree.length) s += "### Agree: implement\n" + groups.agree.map(line).join("\n") + "\n\n";
+    if (groups.decline.length) s += "### Won't fix\n" + groups.decline.map(line).join("\n") + "\n\n";
+    if (groups.note.length) s += "### Comments (no decision yet)\n" + groups.note.map(line).join("\n") + "\n\n";
+    if (groups.none.length) s += "### Undecided (don't change these)\n" + groups.none.map(line).join("\n") + "\n";
+    return s;
+  }
+
   // ---------- overview ----------
   function renderOverview() {
     var counts = {}; SEVS.forEach(function (s) { counts[s] = 0; }); COMMENTS.forEach(function (c) { counts[c.severity] = (counts[c.severity] || 0) + 1; });
@@ -614,7 +881,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
     }
     h += "</div></div>";
 
-    h += requirementsCard() + impactCard() + checksCard();
+    h += focusCard() + requirementsCard() + impactCard() + checksCard();
     var hist = SUMMARY.history;
     if (hist && (hist.context || (hist.timeline && hist.timeline.length))) {
       h += '<div class="card" id="hiCard"><header><h2>History &amp; rationale</h2><span class="tag">git history</span></header><div class="body">' +
@@ -634,7 +901,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
   }
 
   function sideCommentHtml(c) {
-    return '<div class="side-comment' + (store.resolved[c.id] ? " resolved" : "") + '" data-goto="' + esc(c.id) + '"><div style="display:flex;gap:6px;align-items:center"><span class="badge sev-' + esc(c.severity) + '">' + esc(SEV_LABEL[c.severity] || c.severity) + "</span><span style='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>" + inline(c.title || "") + '</span></div><div class="loc">' + esc(c.file + (c.line != null ? ":" + c.line : "")) + "</div></div>";
+    return '<div class="side-comment' + (store.resolved[c.id] ? " resolved" : "") + '" data-goto="' + esc(c.id) + '"><div style="display:flex;gap:6px;align-items:center"><span class="badge sev-' + esc(c.severity) + '">' + esc(SEV_LABEL[c.severity] || c.severity) + "</span><span style='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>" + inline(c.title || "") + "</span>" + (hasFix(c) ? decisionIcon(c.id) : "") + '</div><div class="loc">' + esc(c.file + (c.line != null ? ":" + c.line : "")) + "</div></div>";
   }
 
   // ---------- diff rendering ----------
@@ -662,7 +929,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
         var here = (l.n != null ? idx.lines["new:" + l.n] || [] : []).concat(l.o != null ? idx.lines["old:" + l.o] || [] : []);
         var inR = commentsFor(f.path).some(function (c) { return visibleComment(c) && (l.n != null && inRange(c, "new", l.n) || l.o != null && inRange(c, "old", l.o)); });
         var tr = el("tr", { class: cls + (inR ? " hl" : "") + (here.length ? " hasc" : "") + (l.s ? " insc" : "") },
-          numTd(l.o) + numTd(l.n) + '<td class="sign">' + (cls === "add" ? "+" : cls === "del" ? "−" : "") + '</td><td class="code">' + (hl(l.c, f.language) || " ") + "</td>");
+          numTd(l.o) + numTd(l.n) + signHtml(l, cls) + '<td class="code">' + codeHtml(l, f.language) + "</td>");
         tbody.appendChild(tr);
         if (here.length) { var r = crow(here, 4); if (r) tbody.appendChild(r); }
       });
@@ -691,8 +958,8 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
         var lh = L && cl.some(function (c) { return inRange(c, "old", L.o) || (L === R && inRange(c, "new", R.n)); }) ? " hl" : "";
         var rh = R && cl.some(function (c) { return inRange(c, "new", R.n); }) ? " hl" : "";
         var tr = el("tr", { class: (here.length ? "hasc" : "") + ((R && R.s) || (L && L.s) ? " insc" : "") },
-          '<td class="num ' + lc + lh + '">' + (L ? L.o : "") + '</td><td class="code ' + lc + lh + '">' + (L ? hl(L.c, f.language) || " " : "") + "</td>" +
-          '<td class="num ' + rc + rh + '">' + (R ? R.n : "") + '</td><td class="code ' + rc + rh + '">' + (R ? hl(R.c, f.language) || " " : "") + "</td>");
+          '<td class="num ' + lc + lh + '">' + (L ? L.o : "") + '</td><td class="code ' + lc + lh + '">' + (L ? codeHtml(L, f.language) : "") + "</td>" +
+          '<td class="num ' + rc + rh + '">' + (R ? R.n : "") + '</td><td class="code ' + rc + rh + '">' + (R ? codeHtml(R, f.language) : "") + "</td>");
         tbody.appendChild(tr);
         if (here.length) { var c = crow(here, 4); if (c) tbody.appendChild(c); }
       });
@@ -711,9 +978,20 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
   function renderFiles() {
     var root = $("#files"); root.innerHTML = "";
     var shown = 0;
+    if (state.wordDiff && FILES.some(function (f) { return f.deletions && f.additions; })) {
+      root.appendChild(el("div", { class: "wdlegend" },
+        "<span><span class='sw' style='background:var(--add-bg)'></span>added line</span>" +
+        "<span><span class='sw' style='background:var(--del-bg)'></span>removed line</span>" +
+        "<span>Inside a changed line:</span>" +
+        "<span><code class='wd wd-add'>added</code></span>" +
+        "<span><code class='wd wd-del'>removed</code></span>" +
+        "<span><code class='wd wd-chg-old'>old</code> → <code class='wd wd-chg-new'>new</code> replaced</span>" +
+        "<span>Hover a highlight for details · <kbd>w</kbd> toggles</span>"));
+    }
     FILES.forEach(function (f) {
       if (!fileVisible(f)) return;
       shown++;
+      computeWordDiff(f);
       var cs = commentsFor(f.path), vis = cs.filter(visibleComment);
       var box = el("div", { class: "file" + (collapsed[f.path] ? " collapsed" : ""), id: slug(f.path), "data-path": f.path });
       var head = el("div", { class: "fhead" },
@@ -769,7 +1047,8 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
       list.innerHTML = cs.map(sideCommentHtml).join("") || '<div class="empty-state">No comments match.</div>';
     }
     var total = COMMENTS.filter(function (c) { return c.severity !== "praise"; }), done = total.filter(function (c) { return store.resolved[c.id]; });
-    $("#progressLbl").textContent = done.length + " of " + total.length + " comments resolved";
+    var fixes = decisionItems(), decided = fixes.filter(function (it) { return decision(it.key).d; });
+    $("#progressLbl").textContent = done.length + " of " + total.length + " comments resolved" + (fixes.length ? " · " + decided.length + " of " + fixes.length + " fixes decided" : "");
     $("#progressBar").style.width = (total.length ? 100 * done.length / total.length : 100) + "%";
   }
   function renderAll(keepScroll) {
@@ -882,6 +1161,13 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
       s += "## Approach (" + (aa.rating || "") + ")\n\n" + (aa.analysis || "") + "\n\n";
       (aa.alternatives || []).forEach(function (a) { s += "### Alternative: " + a.title + (a.recommended ? " (recommended)" : "") + "\n\n" + (a.description || "") + "\n\n"; });
     }
+    var fas = SUMMARY.focus_areas || [];
+    if (fas.length) {
+      s += "## Focus areas\n\n| Area | Status | Recommended fix |\n|---|---|---|\n" + fas.map(function (fa) {
+        var rec = fa.recommendation || {};
+        return "| " + (FOCUS_LABEL[fa.area] || fa.area) + " | " + String(fa.status || "").replace("_", " ") + " | " + first(rec.title || rec.description || fa.summary).replace(/\|/g, "\\|") + " |";
+      }).join("\n") + "\n\n";
+    }
     var rqs = (SUMMARY.requirements || {}).items || [];
     if (rqs.length) s += "## Requirements\n\n| ID | Requirement | Status |\n|---|---|---|\n" + rqs.map(function (r) { return "| " + r.id + " | " + String(r.text || "").replace(/\|/g, "\\|").replace(/\n/g, " ") + " | " + r.status + " |"; }).join("\n") + "\n\n";
     var imp = SUMMARY.impact || {};
@@ -896,6 +1182,13 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
   document.addEventListener("click", function (e) {
     var t = e.target;
     var cp = t.closest("[data-copy]"); if (cp) { copy(cp.parentNode.querySelector("code").textContent); return; }
+    var dc = t.closest("[data-decide]");
+    if (dc) {
+      var dbox = dc.closest(".decide"), dkey = dbox.getAttribute("data-dkey"), dv = dc.getAttribute("data-decide");
+      if (dv === "note") { var ta = dbox.querySelector("textarea"); ta.classList.remove("hidden"); ta.focus(); }
+      else setDecision(dkey, dv);
+      return;
+    }
     var go = t.closest("[data-goto]"); if (go) { gotoComment(go.getAttribute("data-goto")); return; }
     var fi = t.closest("[data-file]"); if (fi) { gotoFile(fi.getAttribute("data-file")); return; }
     var gl = t.closest("[data-gotoline]"); if (gl) { e.preventDefault(); var pl = gl.getAttribute("data-gotoline").split("|"); gotoLine(pl[0], pl[1] ? +pl[1] : null); return; }
@@ -913,7 +1206,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
     }
     if (t.closest("[data-copypath]")) { copy(t.closest(".file").getAttribute("data-path")); e.stopPropagation(); return; }
     if (t.closest("[data-viewed]") || t.closest("label")) return;
-    if (t.closest("a, details, summary, pre, button, input")) return;
+    if (t.closest("a, details, summary, pre, button, input, textarea")) return;
     var ch = t.closest(".cmt .chead"); if (ch) { var cmt = ch.parentNode; cmt.classList.toggle("min"); focusComment(cmt, false); return; }
     var fh = t.closest(".fhead"); if (fh) { var box = fh.parentNode, p = box.getAttribute("data-path"); collapsed[p] = !collapsed[p]; box.classList.toggle("collapsed", collapsed[p]); updateExpandBtn(); return; }
     var card = t.closest(".card > header"); if (card) { card.parentNode.classList.toggle("collapsed"); return; }
@@ -928,6 +1221,30 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
       renderSide(); updateExpandBtn();
       if (e.target.checked) stepFile(1);
     }
+  });
+  var noteT;
+  document.addEventListener("input", function (e) {
+    if (!e.target.matches(".decide textarea")) return;
+    var key = e.target.closest(".decide").getAttribute("data-dkey"), val = e.target.value;
+    clearTimeout(noteT);
+    noteT = setTimeout(function () {
+      var d = store.decisions[key] = store.decisions[key] || {};
+      d.note = val.trim() ? val : "";
+      if (!d.d && !d.note) delete store.decisions[key];
+      save(); refreshDecision(key); renderSide();
+      $$('.decide[data-dkey="' + key.replace(/"/g, '\\"') + '"] textarea').forEach(function (o) { if (o !== e.target) o.value = val; });
+    }, 300);
+  });
+  function setWordDiff(on) {
+    state.wordDiff = on; pref("worddiff", on ? "on" : "off");
+    $("#wordDiff").classList.toggle("active", on);
+    renderFiles();
+  }
+  $("#wordDiff").classList.toggle("active", state.wordDiff);
+  $("#wordDiff").addEventListener("click", function () { setWordDiff(!state.wordDiff); });
+  $("#copyDecisions").addEventListener("click", function () {
+    if (!decisionItems().length) { toast("No recommended fixes in this review"); return; }
+    copy(decisionsMd());
   });
   var searchT;
   $("#search").addEventListener("input", function (e) { clearTimeout(searchT); searchT = setTimeout(function () { state.q = e.target.value.trim().toLowerCase(); renderAll(false); }, 120); });
@@ -952,6 +1269,8 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--borde
     else if (k === "r") { var f = $(".cmt.focus"); if (f) toggleResolve(f.getAttribute("data-cid")); }
     else if (k === "x") { var f2 = $(".cmt.focus"); if (f2) f2.classList.toggle("min"); }
     else if (k === "o") $("#overview").scrollIntoView({ behavior: "smooth" });
+    else if (k === "a" || k === "d") { var f3 = $(".cmt.focus"), cid = f3 && f3.getAttribute("data-cid"), cc = cid && COMMENTS.filter(function (c) { return c.id === cid; })[0]; if (cc && hasFix(cc)) setDecision(cid, k === "a" ? "agree" : "decline"); }
+    else if (k === "w") setWordDiff(!state.wordDiff);
     else if (k === "s") setView(state.view === "split" ? "unified" : "split");
     else if (k === "e") toggleAll();
     else if (k === "t") toggleTheme();

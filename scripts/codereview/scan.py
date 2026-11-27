@@ -1,5 +1,6 @@
-"""Automated checks on the code under review: a built-in secret detector plus whichever
-security / dependency scanners are installed (semgrep, bandit, npm audit, pip-audit).
+"""Automated checks on the code under review: a built-in secret detector, built-in N+1 and
+SQL-injection heuristics, plus whichever security / dependency scanners are installed
+(semgrep, bandit, npm audit, pip-audit).
 
 Only files in the review are scanned, and every finding is tagged with whether it sits on a
 changed (or selected) line, so the reviewer can separate what this change introduced from
@@ -109,6 +110,105 @@ def detect_secrets(root, targets):
                                  "message": "Possible %s committed in source: %s" % (rule.replace("-", " "),
                                                                                     _redact(value))})
                 break
+    return findings
+
+
+# ---------------------------------------------------------------- built-in SQL checks
+# Cheap, stack-agnostic heuristics for the two SQL focus areas. They are deliberately
+# "suspect" findings: the reviewer confirms or dismisses each one by reading the code.
+
+COMMENT_LINE_RE = re.compile(r"^\s*(#|//|--|\*|/\*)")
+SQL_SHAPE_RE = re.compile(
+    r"(?i)\bselect\b.+\bfrom\b|\binsert\s+into\b|\bupdate\b\s+\S+\s+\bset\b|\bdelete\s+from\b|"
+    r"\bwhere\b\s+\w+\s*(=|<|>|\bin\b|\blike\b)|\border\s+by\b|\bjoin\b.+\bon\b|\bgroup\s+by\b")
+RAW_SQL_CALL_RE = re.compile(
+    r"\b(find_by_sql|exec_query|select_all|execute|executemany|raw|RawSQL|extra|query|"
+    r"\$queryRawUnsafe|\$executeRawUnsafe|createQuery|createNativeQuery|Exec|Query|QueryRow|"
+    r"sequelize\.query|knex\.raw|DB::(select|statement|raw|unprepared)|whereRaw|orderByRaw|selectRaw)\s*\(")
+INTERPOLATION_RE = re.compile(
+    r"""#\{|\$\{|\bf(['"])[^'"]*\{|['"]\s*(\+|\|\||\.)\s*[A-Za-z_$@(]|[\w)\]]\s*\+\s*['"]|"""
+    r"""['"]\s*%\s*[\w(\[{]|\.format\(|\bsprintf\(|String\.format\(|fmt\.Sprintf\(|\{\$?\w+\}""")
+ORM_STRING_COND_RE = re.compile(
+    r"""\.(where|not|or|having|joins|order|reorder|group|select|pluck|find_by|exists\?|update_all|delete_all|"""
+    r"""filter|whereRaw|andWhere|orWhere)\(\s*(['"`]).*(#\{|\$\{|['"`]\s*\+)""")
+DYNAMIC_ORDER_RE = re.compile(r"""(?i)\.(order|reorder|order_by|orderBy)\(\s*(params|request|req\.|\$_(GET|POST|REQUEST)|args|query)""")
+
+LOOP_RE = re.compile(
+    r"^\s*(for|foreach|while)\b|\.(each|each_with_index|each_with_object|map|flat_map|collect|"
+    r"select|filter|reject|forEach|for_each|find_each|in_batches|reduce|times)\b\s*(\(|\{|do\b)|"
+    r"\bfor\s*\(|\bfor\s+\w+\s*(,\s*\w+)?\s+(in|of|:=)\b")
+FUNC_RE = re.compile(r"^\s*(def|function|func|fn|async\s+def|public|private|protected|static|class|module)\b")
+DB_CALL_RE = re.compile(
+    r"\b[A-Z]\w*\.(find|find_by|find_by!|where|exists\?|count|find_or_create_by|create!?|first|last|pluck)\b|"
+    r"\.objects\.(get|filter|exclude|create|get_or_create|count|aggregate)\(|"
+    r"\b(session|db\.session)\.(query|execute|get|scalar|scalars)\(|"
+    r"\.(findOne|findAll|findByPk|findById|findUnique|findFirst|findMany|findOneBy|findAndCountAll|"
+    r"countDocuments|aggregate)\(|"
+    r"\bprisma\.\w+\.\w+\(|::(find|where|query|firstWhere)\(|\bDB::|"
+    r"\b\w*[Rr]epository\.\w+\(|\bem\.(find|createQuery)\(|"
+    r"\bdb\.(Query|QueryRow|Exec|First|Find|Where|Raw)\(|"
+    r"\b(cursor|conn|connection|client|pool)\.(execute|query)\(")
+
+
+def _indent(s):
+    return len(s) - len(s.lstrip(" \t").replace("\t", "    ")) if s.strip() else None
+
+
+def _enclosing_loop(content, n, lookback=30):
+    """Line number of a loop that encloses line n (by indentation), or None."""
+    cur = _indent(content[n - 1])
+    if cur is None:
+        return None
+    for k in range(n - 1, max(0, n - 1 - lookback), -1):
+        text = content[k - 1]
+        ind = _indent(text)
+        if ind is None or ind >= cur:
+            continue
+        if LOOP_RE.search(text):
+            return k
+        if FUNC_RE.search(text) or ind == 0:
+            return None
+        cur = ind
+    return None
+
+
+def detect_sql_issues(root, targets):
+    findings = []
+    for path, lines in targets.items():
+        try:
+            with open(os.path.join(root, path), encoding="utf-8", errors="replace") as fh:
+                content = fh.read().split("\n")
+        except OSError:
+            continue
+        for n in sorted(lines):
+            if n < 1 or n > len(content):
+                continue
+            text = content[n - 1]
+            if COMMENT_LINE_RE.match(text):
+                continue
+            raw_call = RAW_SQL_CALL_RE.search(text)
+            interp = INTERPOLATION_RE.search(text)
+            if ORM_STRING_COND_RE.search(text) or (interp and (raw_call or SQL_SHAPE_RE.search(text))):
+                findings.append({"tool": "sql-checks", "rule": "sql-injection-suspect", "area": "sql_injection",
+                                 "severity": "high" if (raw_call and SQL_SHAPE_RE.search(text)) or ORM_STRING_COND_RE.search(text)
+                                 else "medium",
+                                 "file": path, "line": n,
+                                 "message": "SQL appears to be built with string interpolation/concatenation; "
+                                            "use bound parameters or the ORM's query builder.",
+                                 "url": "https://cwe.mitre.org/data/definitions/89.html"})
+            elif DYNAMIC_ORDER_RE.search(text):
+                findings.append({"tool": "sql-checks", "rule": "sql-dynamic-order-suspect", "area": "sql_injection",
+                                 "severity": "medium", "file": path, "line": n,
+                                 "message": "ORDER BY / column name taken from request input; "
+                                            "whitelist the allowed columns and directions.",
+                                 "url": "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html"})
+            if DB_CALL_RE.search(text):
+                loop = _enclosing_loop(content, n)
+                if loop:
+                    findings.append({"tool": "sql-checks", "rule": "n-plus-one-suspect", "area": "n_plus_one",
+                                     "severity": "medium", "file": path, "line": n,
+                                     "message": "Database call inside the loop on line %d: one query per item "
+                                                "(N+1). Batch it, eager-load, or query once outside the loop." % loop})
     return findings
 
 
@@ -299,6 +399,12 @@ def run_scans(diff, work_dir, only=None, timeout=180):
     found = detect_secrets(root, targets)
     tools.append({"tool": "secrets", "status": "ran", "note": "built-in", "findings": len(found),
                   "seconds": round(time.time() - t0, 2)})
+    findings += found
+
+    t0 = time.time()
+    found = detect_sql_issues(root, targets)
+    tools.append({"tool": "sql-checks", "status": "ran", "note": "built-in N+1 / SQL injection heuristics",
+                  "findings": len(found), "seconds": round(time.time() - t0, 2)})
     findings += found
 
     for name, binary, fn in SCANNERS:

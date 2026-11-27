@@ -1,9 +1,9 @@
 ---
 name: branch-review
-description: Review ONLY the changes introduced by the current git branch (merge-base..HEAD), or a specific file / line range / folder / editor selection, in any tech stack. Checks the code against supplied requirements (ticket text, docs, images, links), validates the approach and business logic, looks for reusable existing code, runs security/dependency scanners, analyses performance and memory (with optional benchmarks), uses git history, lists impact and caveats, and opens an interactive HTML report with the review inline on the diff.
+description: Review ONLY the changes introduced by the current git branch (merge-base..HEAD), or a specific file / line range / folder / editor selection, in any tech stack. Checks the code against supplied requirements (ticket text, docs, images, links), validates the approach and business logic, looks for reusable existing code, runs security/dependency scanners, has dedicated N+1 query, SQL injection, performance and benchmark checks, recommends the best fix for each finding (the user agrees, declines or comments before anything changes), analyses memory, uses git history, lists impact and caveats, and opens an interactive HTML report with the review inline on a word-level diff.
 argument-hint: "[path[:start-end] ...] [--req <file|url|text> ...] [--selection|--file|--all] [repo-dir] [base-branch] [--head <branch>] [--uncommitted] [--history] [--bench|--no-bench] [--no-scan] [--focus <area>] [--no-open] [-- requirements text]"
 disable-model-invocation: true
-allowed-tools: Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/*) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(git blame *) Bash(git rev-parse *) Bash(git merge-base *) Bash(git ls-files *) Bash(git status *) Bash(git -C *) Bash(git grep *) Bash(ls *) Read Grep Glob WebSearch WebFetch Agent Edit(**/.branch-review/**)
+allowed-tools: Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/*) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(git blame *) Bash(git rev-parse *) Bash(git merge-base *) Bash(git ls-files *) Bash(git status *) Bash(git -C *) Bash(git grep *) Bash(ls *) Read Grep Glob WebSearch WebFetch Agent AskUserQuestion Edit(**/.branch-review/**)
 ---
 
 # Branch code review
@@ -191,7 +191,9 @@ Use what you learn:
 python3 ${CLAUDE_SKILL_DIR}/scripts/scan.py --dir <OUT_DIR>
 ```
 
-It always runs a built-in secret detector, then any installed scanners: semgrep, bandit,
+It always runs a built-in secret detector and built-in `sql-checks` heuristics (SQL built with
+string interpolation/concatenation, `ORDER BY` from request input, and database calls inside loops,
+i.e. N+1 suspects), then any installed scanners: semgrep, bandit,
 npm audit, pip-audit. It never installs anything. Findings are split into **on the change** and
 **pre-existing**. Triage the on-change findings: turn real ones into review comments (cite the
 tool and rule, and link the rule URL in `references`) and ignore false positives. Mention
@@ -248,6 +250,41 @@ Rules for a high-signal review:
 - Each non-praise comment gets a `suggestion` with real code that fits this codebase, and —
   where there is a meaningfully different design — `alternatives` with trade-offs.
 - Don't flag what a linter/formatter in the repo already enforces. Quality over quantity.
+
+## Step 3a — Focus areas: N+1 queries, SQL injection, performance, benchmarks
+
+Always assess these four areas, and record each one in `summary.focus_areas` (one entry per area,
+`status` pass / warn / fail / info / not_applicable, with a one-line reason when not applicable).
+Start from the `sql-checks` suspects in `scan.json`, confirm or dismiss each by reading the code,
+then look for what the heuristics can't see:
+
+- **N+1 queries** (`category: "n-plus-one"`): a query per item of a collection. Look for ORM calls
+  or lazy-loaded associations inside loops, `map`/`each`/`forEach`, serializers, templates and
+  GraphQL resolvers (`post.author` inside `posts.each`). Know the stack's fix: Rails
+  `includes`/`preload`/`eager_load` (and `strict_loading`), Django `select_related`/`prefetch_related`,
+  SQLAlchemy `selectinload`/`joinedload`, Laravel `with()`, Sequelize/Prisma/TypeORM `include`/relations,
+  JPA/Hibernate `JOIN FETCH`/`@EntityGraph`, GraphQL DataLoader, or one `WHERE id IN (...)` query
+  plus a lookup map. Count the queries for a realistic N.
+- **SQL injection** (`category: "sql-injection"`): any SQL or query-fragment built from input with
+  interpolation, concatenation or formatting, including ORM escape hatches (`where("…#{x}")`, `raw`,
+  `extra`, `$queryRawUnsafe`, `knex.raw`, `whereRaw`, `find_by_sql`), dynamic `ORDER BY` / column /
+  table names, `LIKE` patterns, and stored procedures that build SQL. Trace the value back to its
+  source to confirm it is user-controlled. Fix: bound parameters / the query builder; for
+  identifiers, an allow-list. Map to CWE-89 / OWASP.
+- **Performance** (`category: "performance"`): complexity on realistic sizes, work in loops,
+  missing indexes for new queries, `SELECT *` / loading whole tables, missing pagination, blocking
+  I/O on hot paths, repeated serialisation, caching.
+- **Benchmarks**: see Step 3b. Put each benchmark in `summary.checks` (kind `benchmark`), and attach
+  the numbers to the related comment with `benchmark` (before/after). If none was run, set the area
+  to `not_applicable` or `info` and say why (e.g. "needs a database; static analysis only").
+
+**Recommend the best fix — the user decides.** For every non-praise finding, and for each focus
+area that is warn/fail, write the single fix you recommend (`suggestion` / `recommendation`):
+description, real code for this codebase, `why_best` (why it beats the alternatives here),
+`effort` (low/medium/high) and `optional` (false = must fix before merge, e.g. SQL injection or a
+real N+1 on a hot path; true = the user's call, e.g. a micro-optimisation). Put other options in
+`alternatives`. **Never edit the user's code during the review** — fixes are applied only in
+Step 8, after the user agrees.
 
 ## Step 3b — Performance analysis and benchmarks
 
@@ -323,7 +360,24 @@ linked comment or notes, or a `reuse` pointer to a file that doesn't exist.
 
 `render.py` prints a `SUMMARY` block (also saved as `<OUT_DIR>/summary.md`). Your final message
 must contain that summary in full: the verdict, approach rating, recommended alternative, history
-note, requirements coverage, breaking changes and caveats, automated checks, the table of **all**
-findings with `file:line`, and the link to the HTML report. Copy it
+note, requirements coverage, breaking changes and caveats, automated checks, the **focus areas**
+table (N+1, SQL injection, performance, benchmarks), the table of **all** findings with their ID,
+`file:line`, recommended fix and whether it is required or optional, the "Your call on the
+recommended fixes" line, and the link to the HTML report. Copy it
 as printed. Don't shorten the findings table or drop the link. You may add up to 3 sentences on
 the most important thing to fix first. Don't paste the full comment bodies, which are in the report.
+
+## Step 8 — Act on the user's decisions (only when they reply)
+
+The user answers in the chat (`agree c1 c3`, `skip c2`, `agree all required`, `c4: use the
+existing scope instead`) or pastes the **Copy decisions** text from the report (it lists each fix
+under *Agree*, *Won't fix*, *Comments* and *Undecided*). If the user replied in words without IDs,
+and there are 4 or fewer recommended fixes, you may ask with AskUserQuestion (multiSelect, one
+option per fix) to confirm.
+- Implement **only** the fixes the user agreed to, following their side comments (a comment
+  overrides your recommended code). Read `<OUT_DIR>/review.json` for the full recommended fix.
+- Don't touch declined or undecided items. Answer comments that ask a question instead of
+  changing code.
+- Keep each fix minimal, in the codebase's style, and run the relevant tests if there are any.
+- Finish with a short table: ID · fix · done / skipped · files changed. Offer to re-run
+  `/branch-review` to verify.
