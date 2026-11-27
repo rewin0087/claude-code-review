@@ -144,7 +144,32 @@ You can also paste a screenshot or ticket text into the chat and then run `/bran
 - If the branch changed code inside the scope, those changes are reviewed. If it didn't (or you're on `main`), the **current code is reviewed as-is**. Mixed scopes do both, file by file. `--changes-only` / `--as-is` force one mode.
 - Scoped reviews include uncommitted edits, so line numbers match your editor. Each scope gets its own report folder, so it doesn't overwrite the full-branch report.
 
-When the review finishes, Claude posts a summary in the chat (terminal or VS Code): the verdict, the approach rating, the recommended alternative, history notes, a table of **every** finding with `file:line`, and a link to the full interactive report. The same summary is saved as `summary.md`.
+When the review finishes, Claude posts a summary in the chat (terminal or VS Code): the verdict, the approach rating, the recommended alternative, history notes, the **focus areas** table (N+1 queries, SQL injection, performance, benchmarks), a table of **every** finding with its ID, `file:line`, recommended fix and whether that fix is required or optional, and a link to the full interactive report. The same summary is saved as `summary.md`.
+
+### Focus areas: N+1 queries, SQL injection, performance, benchmarks
+
+Every review assesses these four areas, whatever the `--focus`. Each gets a status (pass / warn / fail / info / not applicable), its findings, and the fix Claude recommends for the area as a whole. A built-in `sql-checks` scanner flags likely problems on the changed lines: SQL built with string interpolation or concatenation, `ORDER BY` / column names taken from request input, and database calls inside loops. Claude confirms or dismisses each suspect by reading the code, then looks for what a pattern can't see, such as lazy-loaded associations in serializers or templates. Fixes follow the stack (`includes` / `select_related` / `selectinload` / `with()` / `JOIN FETCH` / DataLoader, bound parameters, allow-listed identifiers). Benchmarks run with `--bench` or when a change is clearly performance-sensitive, and their before/after numbers are attached to the finding.
+
+### Agree, decline or comment on the recommended fixes
+
+Every finding comes with **one recommended fix**: code that fits your codebase, why it's the best option, its effort, and whether it is **required** (e.g. SQL injection) or **optional** (your call). Nothing in your code changes during the review. You decide:
+
+- **In the chat**: reply `agree c1 c3`, `skip c2`, `agree all required`, or `c4: use the existing scope instead`.
+- **In the report**: click **✓ Agree, implement**, **✗ Won't fix** or **💬 Comment** on each fix (or press `a` / `d`). Your choices are saved in the browser. Then click **Copy decisions** and paste the text into Claude Code.
+
+Claude then applies only the fixes you agreed to, follows your comments, leaves the rest alone, and lists what it changed.
+
+### Word-level diff
+
+Added and removed lines keep their green / red background. Inside a line that was **changed**, the exact words get a second, stronger highlight:
+
+| Highlight | Meaning |
+|---|---|
+| strong green | words **added** to the line |
+| strong red, struck through | words **removed** from the line |
+| strong colour with an amber underline | words **replaced** (hover to see the old / new text) |
+
+Each removed line is paired with the most similar added line (its `+` / `−` sign turns amber). This works in the unified and split views. Turn it off with the **Word diff** button or `w`.
 
 The report is written to `<repo>/.branch-review/<branch>/report.html`. That folder is added to the repo's local `.git/info/exclude`, so it never gets committed.
 
@@ -156,6 +181,8 @@ The report is written to `<repo>/.branch-review/<branch>/report.html`. That fold
 | `n` / `p` | next / previous file |
 | `r` | resolve / reopen the focused comment |
 | `x` | collapse / expand the focused comment |
+| `a` / `d` | agree / won't fix the focused comment's recommended fix |
+| `w` | toggle word-level diff highlighting |
 | `s` | toggle unified / split view |
 | `e` | collapse / expand all files |
 | `o` | jump to the overview |
@@ -184,7 +211,7 @@ flowchart TD
         B4["Snapshot unchanged code<br/>to review it as-is"]
         B5[("diff.json + meta.json")]
         B6["context.py<br/>collect the requirement sources"]
-        B7["scan.py<br/>secrets, semgrep, bandit,<br/>npm audit, pip-audit"]
+        B7["scan.py<br/>secrets, sql-checks (N+1, SQLi),<br/>semgrep, bandit, npm audit, pip-audit"]
     end
 
     subgraph AI["3 - AI review: Claude Code"]
@@ -194,6 +221,7 @@ flowchart TD
         C3["Git history<br/>blame, log -L, log -S<br/>why the code exists"]
         C9["Requirements checklist<br/>R1, R2 ... from the sources"]
         C4["Review checklist<br/>requirements, business logic,<br/>reuse / DRY, security, memory,<br/>performance, design, tests"]
+        C11["Focus areas<br/>N+1, SQL injection,<br/>performance, benchmarks<br/>+ recommended fix each"]
         C10["Benchmarks when needed<br/>throwaway, in the output folder"]
         C5["Validate the approach<br/>rate it, propose alternatives,<br/>impact and caveats"]
         C6["Web research<br/>official docs, OWASP / CWE,<br/>RFCs, open-source code"]
@@ -209,13 +237,15 @@ flowchart TD
     subgraph OUT["5 - Outcome"]
         E1["Verdict<br/>requirements coverage,<br/>impact and caveats"]
         E2["Inline findings<br/>fix, reasoning, alternatives,<br/>references, history"]
-        E3["You act<br/>fix code, resolve comments,<br/>Open in VS Code, Copy MD to the PR"]
+        E3["You decide<br/>agree / won't fix / comment<br/>on each recommended fix"]
+        E4["Claude applies<br/>only the agreed fixes"]
     end
 
     A1 & A2 & A3 & A4 --> B1
     A5 --> B6 --> C9 --> C4
     B5 --> B7 --> C4
-    C4 -. perf-sensitive .-> C10 -.-> C5
+    C4 --> C11 --> C5
+    C11 -. perf-sensitive .-> C10 -.-> C5
     B1 --> B2 --> B3 --> B5
     B1 --> B4 --> B5
     B5 --> C1
@@ -229,7 +259,7 @@ flowchart TD
     D1 -- yes --> D2 & D3
     D3 --> E1
     D2 --> E2
-    E1 & E2 --> E3
+    E1 & E2 --> E3 --> E4
 ```
 
 | Stage | Who does it | Output |
@@ -238,7 +268,7 @@ flowchart TD
 | **2. Collect** | `collect_diff.py`, `context.py`, `scan.py`: deterministic, no AI | `diff.json`, `context.json`, `scan.json` |
 | **3. AI review** | Claude Code, guided by `SKILL.md` | `review.json` |
 | **4. Validate and render** | `render.py`: checks every line anchor and commit SHA | `report.html`, `summary.md` |
-| **5. Outcome** | You, in the chat and the browser | fixes, resolved comments, PR notes |
+| **5. Outcome** | You decide on each fix; Claude applies the agreed ones | fixes, resolved comments, PR notes |
 
 The scripts handle the exact parts: which lines changed, line numbers, SHAs, rendering. Claude does the judgement: bugs, design, alternatives, research. Because `render.py` rejects anything that doesn't match the real diff or git history, the report can't point at lines or commits that don't exist.
 
@@ -277,7 +307,9 @@ sequenceDiagram
     S-->>R: report.html
     S-->>CC: summary.md
     CC-->>You: verdict, findings table, link to the report
-    You->>R: navigate, resolve, copy as Markdown
+    You->>R: navigate, resolve, agree / decline / comment on fixes
+    You->>CC: agree c1 c3, or paste Copy decisions
+    CC->>G: apply only the agreed fixes
 ```
 
 ### The result
@@ -292,9 +324,20 @@ Adds user search, but the query is SQL-injectable and the client doesn't encode 
 **Approach — questionable:** String interpolation into SQL breaks the parameterised pattern ...
 **Recommended alternative:** Parameterised LIKE with escaped wildcards
 
-| # | Severity | Location    | Issue                         | Suggested fix      |
-| 1 | critical | users.py:11 | SQL injection in search_users | Use a placeholder. |
-| 2 | major    | app.js:2    | Query param not URL-encoded   | see code in report |
+### Focus areas
+| Area          | Status | Findings | Recommended fix                            |
+| N+1 queries   | ✓ pass | none     | Single query, no loop.                     |
+| SQL injection | ✗ fail | `c1`     | Bind parameters _(effort: low)_            |
+| Performance   | ! warn | `c3`     | Add an index on users.name _(effort: low)_ |
+| Benchmarks    | – n/a  | none     | Needs a database; static analysis only.    |
+
+### Findings and recommended fixes
+| ID | Severity | Area          | Location    | Issue                         | Recommended fix    | Fix      |
+| c1 | critical | SQL injection | users.py:11 | SQL injection in search_users | Use a placeholder. | required |
+| c2 | major    | correctness   | app.js:2    | Query param not URL-encoded   | see code in report | required |
+| c3 | minor    | Performance   | users.py:9  | LIKE on an unindexed column   | Add an index.      | optional |
+
+**Your call on the recommended fixes:** reply with e.g. `agree c1 c3`, `skip c2`, or `c4: <your comment>` ...
 
 **Full interactive review**: report.html
 ```
@@ -303,19 +346,23 @@ Adds user search, but the query is SQL-injectable and the client doesn't encode 
 
 ```text
 +--------------------------------------------------------------------------------+
-| repo  branch -> base  [scope] +13 -0  [REQUEST CHANGES]  Unified|Split Copy MD |
+| repo branch->base +13 -0 [REQUEST CHANGES] Unified|Split WordDiff Decisions MD |
 +-----------------------+--------------------------------------------------------+
 | Filter files/comments | REVIEW SUMMARY   headline, stack, severity counts,     |
 | (o) Critical (o) Major|                  "must address" list                   |
 | [ ] Hide resolved     | APPROACH         rating, analysis, alternatives with   |
 | ####---- 2/5 resolved |                  pros / cons / references              |
+| 1 of 3 fixes decided  | FOCUS AREAS      N+1 | SQL injection | perf | bench    |
+|                       |                  status, findings, recommended fix     |
 | [Files] [Comments]    | HISTORY          timeline of the commits behind it     |
 |                       | ------------------------------------------------------ |
 | app.js      (1) +4 -0 | app.js                                                 |
-| users.py    (4) +9 -0 |  2 + const res = await fetch('/api/users?name=' + ...  |
+| users.py    (4) +9 -0 |  2 - const res = await fetch(url + [[name]])           |
+|                       |  2 + const res = await fetch(url + [[encode(name)]])   |
 |                       |    +- MAJOR  Query param not URL-encoded ----------+   |
-|                       |    | problem, reasoning, suggested fix (copy),     |   |
-|                       |    | alternatives, references, history             |   |
+|                       |    | problem, reasoning, alternatives, references  |   |
+|                       |    | RECOMMENDED FIX  required · effort: low       |   |
+|                       |    | [Agree, implement] [Won't fix] [Comment]      |   |
 |                       |    | [Resolve] [Copy as Markdown] [Open in VS Code]|   |
 |                       |    +-----------------------------------------------+   |
 +-----------------------+--------------------------------------------------------+
@@ -336,7 +383,7 @@ scripts/                      thin command-line entry points
   collect_diff.py             what to review -> diff.json / meta.json
   history.py                  git history digest -> history.json
   context.py                  requirement sources -> context/ + context.json
-  scan.py                     secret detector + installed scanners -> scan.json
+  scan.py                     secret detector, sql-checks + installed scanners -> scan.json
   render.py                   review.json -> report.html + summary.md
 scripts/codereview/           the logic (importable, raises ReviewError instead of exiting)
   gitcmd.py                   running git, resolving refs, repo housekeeping
@@ -347,7 +394,7 @@ scripts/codereview/           the logic (importable, raises ReviewError instead 
   collect.py                  ties the above together into the review input
   githistory.py               blame / log analysis of the code under review
   context.py                  ingest tickets, specs, docs, images, links
-  scan.py                     secret detection and scanner integrations
+  scan.py                     secret detection, N+1 / SQL-injection heuristics, scanner integrations
   review.py                   review.json validation, cited-commit checks
   summary.py                  the summary posted in the chat
   report.py                   HTML report generation

@@ -26,6 +26,13 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 - The findings table in the chat now shows the comment ID, focus area, and whether the fix is
   required or optional.
+- README: new sections on focus areas, deciding on recommended fixes, and the word-level diff;
+  updated workflow diagrams, sample output and keyboard shortcuts.
+
+### Upgrading
+- Plugin: `claude plugin update branch-review@rewin0087`. Standalone: `git -C ~/.claude/skills/branch-review pull`.
+- Nothing breaks: an older review.json still renders, and `render.py` asks for the new
+  `summary.focus_areas` with a warning.
 
 ## [2.0.0] - 2026-11-20
 
@@ -93,3 +100,4 @@ First public release.
 [1.0.0]: https://github.com/rewin0087/claude-code-review/releases/tag/v1.0.0
 [1.1.0]: https://github.com/rewin0087/claude-code-review/compare/v1.0.0...v1.1.0
 [2.0.0]: https://github.com/rewin0087/claude-code-review/compare/v1.1.0...v2.0.0
+[2.1.0]: https://github.com/rewin0087/claude-code-review/compare/v2.0.0...v2.1.0
